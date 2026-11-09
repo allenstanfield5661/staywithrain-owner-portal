@@ -1,0 +1,10 @@
+{
+  "owners": [
+    {
+      "id": "owner-placeholder",
+      "name": "Placeholder Owner",
+      "email": "owner@example.com",
+      "listingIds": ["REPLACE_WITH_HOSTAWAY_LISTING_ID"]
+    }
+  ]
+}

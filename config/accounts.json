@@ -1,0 +1,37 @@
+[
+  {
+    "id": "marina",
+    "name": "Marina Cole",
+    "email": "marina.cole@rainstanfield.example",
+    "role": "admin",
+    "password": "preview-admin"
+  },
+  {
+    "id": "elena",
+    "name": "Elena Voss",
+    "email": "elena.voss@example.com",
+    "role": "owner",
+    "password": "coastal-preview"
+  },
+  {
+    "id": "james",
+    "name": "James Okonkwo",
+    "email": "james.okonkwo@example.com",
+    "role": "owner",
+    "password": "coastal-preview"
+  },
+  {
+    "id": "priya",
+    "name": "Priya Nandakumar",
+    "email": "priya.nandakumar@example.com",
+    "role": "owner",
+    "password": "coastal-preview"
+  },
+  {
+    "id": "chris",
+    "name": "Chris Dalton",
+    "email": "chris.dalton@example.com",
+    "role": "owner",
+    "password": "coastal-preview"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "calendarName": "STR Golf Cart Rentals",
+  "mappings": [
+    { "tag": "(A)", "unitId": "peaceful-pearl" },
+    { "tag": "(Donald's)", "unitId": "peaceful-pearl" },
+    { "tag": "(7A)", "unitId": "porter-vibe" },
+    { "tag": "(19)", "unitId": "porter-pulse-19" }
+  ]
+}

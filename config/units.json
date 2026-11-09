@@ -1,0 +1,58 @@
+[
+  {
+    "id": "picture-book-cottage",
+    "name": "Picture Book Cottage",
+    "town": "Bay St. Louis",
+    "bedrooms": 3,
+    "hostawayListingId": null
+  },
+  {
+    "id": "pass-picture-book",
+    "name": "Pass Picture Book",
+    "town": "Pass Christian",
+    "bedrooms": 2,
+    "hostawayListingId": null
+  },
+  {
+    "id": "pass-porch",
+    "name": "Pass Porch",
+    "town": "Pass Christian",
+    "bedrooms": 2,
+    "hostawayListingId": null
+  },
+  {
+    "id": "peaceful-pearl",
+    "name": "Peaceful Pearl",
+    "town": "Ocean Springs",
+    "bedrooms": 4,
+    "hostawayListingId": null
+  },
+  {
+    "id": "porter-vibe",
+    "name": "Porter Vibe",
+    "town": "Gulfport",
+    "bedrooms": 3,
+    "hostawayListingId": null
+  },
+  {
+    "id": "maree-maison",
+    "name": "Marée Maison",
+    "town": "Bay St. Louis",
+    "bedrooms": 3,
+    "hostawayListingId": null
+  },
+  {
+    "id": "porter-bloom",
+    "name": "Porter Bloom",
+    "town": "Gulfport",
+    "bedrooms": 2,
+    "hostawayListingId": null
+  },
+  {
+    "id": "porter-pulse-19",
+    "name": "Porter Pulse #19",
+    "town": "Gulfport",
+    "bedrooms": 2,
+    "hostawayListingId": null
+  }
+]
