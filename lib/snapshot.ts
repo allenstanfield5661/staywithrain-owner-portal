@@ -5,7 +5,7 @@ import { loadLiveCalendar } from "@/lib/hostaway";
 import { parseIcs, type ParsedCart } from "@/lib/ics";
 import { buildMockIcs, buildMockStays } from "@/lib/mock-source";
 import type { PublicStay } from "@/lib/stays";
-import { CACHE_TTL_MS, peek, remember } from "@/lib/timed-cache";
+import { CACHE_TTL_MS, peekEntry, writeTimedCache } from "@/lib/timed-cache";
 
 export type { DataSource };
 export { dataMode };
@@ -74,16 +74,24 @@ export async function buildSnapshot(now: Date): Promise<Snapshot> {
   };
 }
 
-export async function readCachedSnapshot(now: Date = new Date()): Promise<Snapshot | null> {
-  if (dataMode() === "mock") return buildMockSnapshot(now);
-  return peek<Snapshot>(snapshotCacheKey(now));
+export type CachedSnapshot = { snapshot: Snapshot; stale: boolean };
+
+export async function readCachedSnapshot(now: Date = new Date()): Promise<CachedSnapshot | null> {
+  if (dataMode() === "mock") return { snapshot: buildMockSnapshot(now), stale: false };
+  const entry = await peekEntry<Snapshot>(snapshotCacheKey(now));
+  if (!entry) return null;
+  return { snapshot: entry.value, stale: entry.stale };
 }
 
-export async function warmSnapshot(now: Date = new Date()): Promise<Snapshot> {
+export async function warmSnapshot(now: Date = new Date(), options?: { force?: boolean }): Promise<Snapshot> {
   if (dataMode() === "mock") return buildMockSnapshot(now);
-  return remember(snapshotCacheKey(now), CACHE_TTL_MS, () => buildSnapshot(now), {
-    shouldPersist: (value) => !value.warning,
-  });
+  if (!options?.force) {
+    const entry = await peekEntry<Snapshot>(snapshotCacheKey(now));
+    if (entry && !entry.stale) return entry.value;
+  }
+  const snapshot = await buildSnapshot(now);
+  if (!snapshot.warning) await writeTimedCache(snapshotCacheKey(now), CACHE_TTL_MS, snapshot);
+  return snapshot;
 }
 
 export async function loadSnapshot(now?: Date): Promise<Snapshot> {
@@ -91,7 +99,7 @@ export async function loadSnapshot(now?: Date): Promise<Snapshot> {
   await io();
   const clock = now ?? new Date();
   const cached = await readCachedSnapshot(clock);
-  if (cached) return cached;
+  if (cached) return cached.snapshot;
   return warmSnapshot(clock);
 }
 

@@ -22,8 +22,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "Sign in required." }, { status: 401 });
     }
     const now = new Date();
-    const snapshot = await readCachedSnapshot(now);
-    if (!snapshot) {
+    const cached = await readCachedSnapshot(now);
+    if (!cached) {
       triggerCalendarWarm();
       return NextResponse.json(
         {
@@ -34,21 +34,31 @@ export async function GET(request: Request) {
         { status: 503, headers: { "cache-control": "no-store" } },
       );
     }
+    if (cached.stale) triggerCalendarWarm();
     const url = new URL(request.url);
     const publicAccount = toPublicAccount(account);
-    const assignments = snapshot.source === "live" ? await liveAssignmentMap() : readAssignments();
+    const assignments = cached.snapshot.source === "live" ? await liveAssignmentMap() : readAssignments();
     const view = buildPortalView({
       account: publicAccount,
-      units: snapshot.units ?? listUnits(),
+      units: cached.snapshot.units ?? listUnits(),
       assignments,
-      snapshot,
+      snapshot: cached.snapshot,
       unit: url.searchParams.get("unit") ?? undefined,
       month: url.searchParams.get("month") ?? undefined,
       now,
     });
-    console.info(`calendar api cache-hit ${Date.now() - started}ms stays=${snapshot.stays.length}`);
+    console.info(
+      `calendar api cache-hit ${Date.now() - started}ms stays=${cached.snapshot.stays.length}${cached.stale ? " stale" : ""}`,
+    );
     return NextResponse.json(
-      { ok: true, view },
+      {
+        ok: true,
+        stale: cached.stale,
+        view,
+        snapshot: cached.snapshot,
+        assignments,
+        account: publicAccount,
+      },
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

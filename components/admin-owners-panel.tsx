@@ -30,14 +30,12 @@ export function AdminOwnersPanel() {
       const body = (await response.json()) as AdminResponse;
       if (!body.ok && !body.owners) {
         setError(body.error || "The admin page could not be loaded.");
-        setPayload(null);
         return;
       }
       setPayload(body);
       setError(body.ok ? null : body.error || null);
     } catch {
       setError("The admin page could not be loaded. Try again in a moment.");
-      setPayload(null);
     } finally {
       setLoading(false);
     }

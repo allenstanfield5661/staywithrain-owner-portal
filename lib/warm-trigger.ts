@@ -1,10 +1,10 @@
-/** Fire-and-forget a cache warm. Never throw and never wait for Hostaway. */
+/** Fire-and-forget a cache warm. Never throw and never wait on Hostaway. */
 export function triggerCalendarWarm(): void {
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL || "https://staywithrain.netlify.app";
   const secret = process.env.CRON_SECRET ?? "";
   const headers: Record<string, string> = { "cache-control": "no-store" };
   if (secret) headers.authorization = `Bearer ${secret}`;
-  void fetch(`${base.replace(/\/$/, "")}/.netlify/functions/warm-calendar`, {
+  void fetch(`${base.replace(/\/$/, "")}/api/cron/warm`, {
     method: "POST",
     headers,
     cache: "no-store",

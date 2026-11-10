@@ -19,7 +19,7 @@ export default async (request: Request) => {
   }
   const started = Date.now();
   try {
-    const snapshot = await warmSnapshot(new Date());
+    const snapshot = await warmSnapshot(new Date(), { force: true });
     const body = JSON.stringify({
       ok: true,
       units: snapshot.units?.length ?? 0,

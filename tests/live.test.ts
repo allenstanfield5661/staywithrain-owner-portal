@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { authenticate } from "@/lib/authenticate";
 import { buildPortalView } from "@/lib/view";
-import { clearTimedCache } from "@/lib/timed-cache";
-import { readCachedSnapshot, warmSnapshot } from "@/lib/snapshot";
+import { clearTimedCache, setTimedCacheForTests } from "@/lib/timed-cache";
+import { readCachedSnapshot, snapshotCacheKey, warmSnapshot } from "@/lib/snapshot";
 import { withTimeout } from "@/lib/timeout";
 import { loadLiveCalendar, setHostawayFetchForTests } from "@/lib/hostaway";
 import { createInviteToken, readInviteToken } from "@/lib/invites";
@@ -375,11 +375,62 @@ describe("snapshot cache", () => {
     const now = new Date("2026-11-05T18:00:00Z");
     const warmed = await warmSnapshot(now);
     const cached = await readCachedSnapshot(now);
-    expect(cached?.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
-    expect(cached?.units?.map((unit) => unit.id)).toEqual(warmed.units?.map((unit) => unit.id));
+    expect(cached?.stale).toBe(false);
+    expect(cached?.snapshot.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    expect(cached?.snapshot.units?.map((unit) => unit.id)).toEqual(warmed.units?.map((unit) => unit.id));
     const hostawayCalls = calls.length;
-    await expect(readCachedSnapshot(now)).resolves.toEqual(cached);
+    const again = await readCachedSnapshot(now);
+    expect(again?.snapshot).toEqual(cached?.snapshot);
     expect(calls).toHaveLength(hostawayCalls);
+    expect(snapshotCacheKey(now)).toBe("snapshot:2026-11-01:2027-05-01");
+  });
+
+  it("keeps serving an expired snapshot without calling Hostaway", async () => {
+    process.env.DATA_MODE = "live";
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    const calls: string[] = [];
+    setHostawayFetchForTests(async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/accessTokens")) {
+        return Response.json({ access_token: "token-should-not-leak", expires_in: 3600 });
+      }
+      if (url.includes("/listings")) {
+        return Response.json({
+          result: [{ id: 11, name: "Peaceful Pearl", city: "Ocean Springs", bedroomsNumber: 4 }],
+          count: 1,
+        });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        return Response.json({
+          result: [
+            {
+              id: 1,
+              listingMapId: 11,
+              guestFirstName: "Camille",
+              guestLastName: "Duval",
+              arrivalDate: "2026-11-03",
+              departureDate: "2026-11-08",
+              status: "new",
+              channelName: "airbnb",
+            },
+          ],
+          count: 1,
+        });
+      }
+      throw new Error(url);
+    });
+    const now = new Date("2026-11-05T18:00:00Z");
+    const warmed = await warmSnapshot(now);
+    const before = calls.length;
+    setTimedCacheForTests(snapshotCacheKey(now), warmed, Date.now() - 1000);
+    const stale = await readCachedSnapshot(now);
+    expect(stale?.stale).toBe(true);
+    expect(stale?.snapshot.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    expect(calls).toHaveLength(before);
   });
 });
 

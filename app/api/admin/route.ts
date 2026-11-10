@@ -19,8 +19,8 @@ export async function GET() {
     }
     const now = new Date();
     const owners = await publicOwners();
-    const snapshot = await readCachedSnapshot(now);
-    if (!snapshot) {
+    const cached = await readCachedSnapshot(now);
+    if (!cached) {
       triggerCalendarWarm();
       return NextResponse.json(
         {
@@ -37,10 +37,13 @@ export async function GET() {
         { headers: { "cache-control": "no-store" } },
       );
     }
+    if (cached.stale) triggerCalendarWarm();
+    const snapshot = cached.snapshot;
     return NextResponse.json(
       {
         ok: true,
         warming: false,
+        stale: cached.stale,
         owners,
         listings: (snapshot.units ?? []).map((unit) => ({ id: unit.id, name: unit.name, town: unit.town })),
         sourceNote: snapshot.source === "mock" ? "Preview sample" : "Hostaway",
