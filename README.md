@@ -77,7 +77,7 @@ Live mode does not fall back to the sample guests. If Hostaway rejects the crede
 
 ## Plug in the golf-cart calendar
 
-Live cart rentals come from **Subedi Realty Golf Cart** (secret iCal in `GOLF_CART_ICS_URLS`) and from **STR Golf Cart Rentals** events pushed to `POST /api/golfcart/push`. Event titles look like `Guest Name- Property (cart tag)`. The portal assigns each rental to the house that **owns the cart tag** (`config/cart-aliases.json` → `cartOwners`): `(19)` Porter Pulse, `(7A)` Porter Vibe, `(A)` / `(Donald's)` Peaceful Pearl, `(11)` Porter 11 / Five by the Sea. Every Subedi event is cart `(19)`. Duplicate events are merged. The preview/mock feed still uses the unit tags in [`config/cart-tags.json`](config/cart-tags.json).
+Live cart rentals come from **Subedi Realty Golf Cart** (secret iCal in `GOLF_CART_ICS_URLS`) and from **STR Golf Cart Rentals** events pushed to `POST /api/golfcart/push`. Event titles look like `Guest Name- Property (cart tag)`. The portal assigns each rental to the house that **owns the cart tag** (`config/cart-aliases.json` → `cartOwners`): `(19)` Porter Pulse, `(7A)` / `(7)` Porter Vibe, `(A)` / `(Donald's)` Peaceful Pearl, `(11)` Porter 11 / Five by the Sea. Every Subedi event is cart `(19)`. Duplicate events are merged. The preview/mock feed still uses the unit tags in [`config/cart-tags.json`](config/cart-tags.json).
 
 In Google Calendar, open the Subedi golf cart calendar → **Settings and sharing → Integrate calendar**, and copy the **Secret address in iCal format**. Put it in `.env.local` (and in Netlify for production):
 

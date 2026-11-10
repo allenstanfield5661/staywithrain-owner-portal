@@ -89,6 +89,6 @@ STR Golf Cart Rentals has no secret iCal address (edit access only). A scheduled
 ]
 ```
 
-`start` / `end` are exclusive-end ISO dates (`YYYY-MM-DD`), same as all-day iCal. Each successful push **replaces** the whole STR Golf Cart Rentals set stored in Netlify Blobs (`golfcart:events`). Subedi Realty Golf Cart continues to come from `GOLF_CART_ICS_URLS`. Cart tags map to owning listings: `(19)` → Porter Pulse 597423, `(7A)` → Porter Vibe 484254, `(A)` / `(Donald's)` → Peaceful Pearl 516343, `(11)` → Porter 11 / Five by the Sea 501592. Every Subedi event is treated as cart `(19)`.
+`start` / `end` are exclusive-end ISO dates (`YYYY-MM-DD`), same as all-day iCal. Each successful push **replaces** the whole STR Golf Cart Rentals set stored in Netlify Blobs (`golfcart:events`). Subedi Realty Golf Cart continues to come from `GOLF_CART_ICS_URLS`. Cart tags map to owning listings: `(19)` → Porter Pulse 597423, `(7A)` / `(7)` → Porter Vibe 484254, `(A)` / `(Donald's)` → Peaceful Pearl 516343, `(11)` → Porter 11 / Five by the Sea 501592. Every Subedi event is treated as cart `(19)`.
 
 Ready-to-run helper: `/workspace/owner-portal-live/push_golfcart.sh <events.json>` — prints only the HTTP status and accepted count.

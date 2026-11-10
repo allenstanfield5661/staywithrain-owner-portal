@@ -163,6 +163,9 @@ describe("golf cart calendar", () => {
     const owners = cartOwnerTagMappings();
     expect(matchTag("Cathy- Oasis (11)", owners)?.unitId).toBe("501592");
     expect(extractCartTag("Cathy- Oasis (11)")).toBe("(11)");
+    expect(matchTag("Emily Brown- Porter 38 (7)", mappings)?.unitId).toBe("porter-vibe");
+    expect(matchTag("Emily Brown- Porter 38 (7)", owners)?.unitId).toBe("484254");
+    expect(extractCartTag("Emily Brown- Porter 38 (7)")).toBe("(7)");
     expect(extractCartTag("No tag here")).toBeNull();
   });
 
@@ -367,6 +370,25 @@ describe("golf cart tag matching", () => {
     // (7A) is never treated as (A)
     expect(assignCartEvent("Owen- Stay (7A)", units)?.tag).toBe("(7A)");
     expect(assignCartEvent("Owen- Stay (7A)", units)?.unitIds).toEqual(["484254"]);
+  });
+
+  it("maps (7) to Porter Vibe with an exact parenthetical match, not as a prefix of (7A)", () => {
+    const emily = assignCartEvent("Emily Brown- Porter 38 (7)", units);
+    expect(emily?.tag).toBe("(7)");
+    expect(emily?.unitIds).toEqual(["484254"]);
+    expect(extractCartTag("Emily Brown- Porter 38 (7)")).toBe("(7)");
+    // (7A) stays (7A), never splits or remaps to (7)
+    expect(extractCartTag("Guest- Porter Vibe (7A)")).toBe("(7A)");
+    expect(assignCartEvent("Guest- Porter Vibe (7A)", units)?.tag).toBe("(7A)");
+    expect(assignCartEvent("Guest- Porter Vibe (7A)", units)?.unitIds).toEqual(["484254"]);
+    // Nearby numbers in parentheses must not match (7)
+    expect(extractCartTag("Stay (17)")).toBeNull();
+    expect(extractCartTag("Stay (70)")).toBeNull();
+    expect(assignCartEvent("Emily Brown- Porter 38 (17)", units)).toBeNull();
+    // A bare 7 in the property name, without a (7) tag, is unmatched
+    expect(assignCartEvent("Emily Brown- Porter 7", units)).toBeNull();
+    expect(assignCartEvent("Emily Callahan- #7 (A)", units)?.tag).toBe("(A)");
+    expect(assignCartEvent("Emily Callahan- #7 (A)", units)?.unitIds).toEqual(["516343"]);
   });
 
   it("forces Subedi Realty Golf Cart events onto cart (19) / Porter Pulse", () => {
