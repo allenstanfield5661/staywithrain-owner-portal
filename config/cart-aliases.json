@@ -1,0 +1,15 @@
+{
+  "aliases": {
+    "484242": ["CAOP 21", "Cottages at Oak Park 21", "Picture book cottage"],
+    "484245": ["Porter 21"],
+    "484255": ["Porter 38"],
+    "494975": ["Porches", "The Porches"],
+    "520706": ["Curt's Cottage", "Curts Cottage"],
+    "484246": ["Maree Maison", "Marée Maison", "1010 Calhoun"],
+    "579762": ["Oasis on Desoto"],
+    "597423": ["Porter Pulse", "Porter 19"]
+  },
+  "cartOwners": {
+    "(19)": "597423"
+  }
+}

@@ -29,6 +29,7 @@ export function MonthCalendar({
   events,
   legend,
   empty,
+  listEvents = false,
 }: {
   title: string;
   description?: string;
@@ -40,6 +41,7 @@ export function MonthCalendar({
   events: CalendarEvent[];
   legend: { tone: CalendarTone; label: string }[];
   empty: string;
+  listEvents?: boolean;
 }) {
   const weeks = monthGrid(month);
   const weekday = weeks[0].map((day) => day.iso);
@@ -166,13 +168,26 @@ export function MonthCalendar({
         ))}
         {events.length === 0 ? <span>{empty}</span> : null}
       </div>
-      <ul className="sr-only">
-        {events.map((event) => (
-          <li key={event.id}>
-            {event.label}, {formatStayDate(event.start)} through {formatStayDate(addDays(event.end, -1))}
-          </li>
-        ))}
-      </ul>
+      {listEvents && events.length > 0 ? (
+        <ul className="mt-4 space-y-1.5 px-1 text-sm">
+          {events
+            .slice()
+            .sort((a, b) => a.start.localeCompare(b.start) || a.label.localeCompare(b.label))
+            .map((event) => (
+              <li key={event.id}>
+                {event.label} · {formatStayDate(event.start)}–{formatStayDate(addDays(event.end, -1))}
+              </li>
+            ))}
+        </ul>
+      ) : (
+        <ul className="sr-only">
+          {events.map((event) => (
+            <li key={event.id}>
+              {event.label}, {formatStayDate(event.start)} through {formatStayDate(addDays(event.end, -1))}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

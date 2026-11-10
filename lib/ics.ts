@@ -1,3 +1,5 @@
+import { assignCartEvent, type CartAssignment } from "@/lib/cart-match";
+import type { Unit } from "@/lib/catalog";
 import { addDays, isoDate, todayInTimeZone, GULF_TZ } from "@/lib/dates";
 import { redactEventLabel } from "@/lib/privacy";
 
@@ -109,7 +111,9 @@ function rangeFor(startProp: Prop, endProp: Prop | undefined): { start: string; 
   return { start, end: addDays(start, 1) };
 }
 
-export function parseIcs(ics: string, mappings: TagMapping[]): ParsedCalendar {
+type EventAssignment = { unitIds: string[]; tag: string; label: string } | null;
+
+function parseIcsWithAssigner(ics: string, assign: (summary: string) => EventAssignment): ParsedCalendar {
   const text = unfold(ics);
   const nameMatch = /X-WR-CALNAME:(.*)/i.exec(text);
   const calendarName = nameMatch ? unescapeText(nameMatch[1].trim()) : null;
@@ -127,8 +131,8 @@ export function parseIcs(ics: string, mappings: TagMapping[]): ParsedCalendar {
       unmatched += 1;
       return;
     }
-    const mapping = matchTag(summary, mappings);
-    if (!mapping) {
+    const assignment = assign(summary);
+    if (!assignment || assignment.unitIds.length === 0) {
       unmatched += 1;
       return;
     }
@@ -137,17 +141,36 @@ export function parseIcs(ics: string, mappings: TagMapping[]): ParsedCalendar {
       unmatched += 1;
       return;
     }
-    const uid = props.UID?.value?.trim() || `${mapping.unitId}-${range.start}-${index}`;
-    events.push({
-      id: uid,
-      unitId: mapping.unitId,
-      tag: mapping.tag,
-      label: redactEventLabel(summary, mapping.tag),
-      start: range.start,
-      end: range.end,
-    });
+    const uid = props.UID?.value?.trim() || `${assignment.unitIds[0]}-${range.start}-${index}`;
+    for (const unitId of assignment.unitIds) {
+      events.push({
+        id: assignment.unitIds.length === 1 ? uid : `${uid}:${unitId}`,
+        unitId,
+        tag: assignment.tag,
+        label: assignment.label,
+        start: range.start,
+        end: range.end,
+      });
+    }
   });
   return { calendarName, events, unmatched };
+}
+
+export function parseIcs(ics: string, mappings: TagMapping[]): ParsedCalendar {
+  return parseIcsWithAssigner(ics, (summary) => {
+    const mapping = matchTag(summary, mappings);
+    if (!mapping) return null;
+    return {
+      unitIds: [mapping.unitId],
+      tag: mapping.tag,
+      label: redactEventLabel(summary, mapping.tag),
+    };
+  });
+}
+
+/** Match cart rentals to listings by the property name in the title, then by a known cart owner. */
+export function parseIcsForUnits(ics: string, units: Unit[]): ParsedCalendar {
+  return parseIcsWithAssigner(ics, (summary) => assignCartEvent(summary, units) as CartAssignment | null);
 }
 
 export function escapeIcsText(value: string): string {

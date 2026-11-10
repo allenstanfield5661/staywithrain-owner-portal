@@ -77,24 +77,15 @@ Live mode does not fall back to the sample guests. If Hostaway rejects the crede
 
 ## Plug in the golf-cart calendar
 
-Cart rentals come from the Google Calendar named **STR Golf Cart Rentals**. Event titles carry a unit tag:
+Live cart rentals come from two Google calendars: **STR Golf Cart Rentals** and **Subedi Realty Golf Cart**. Event titles look like `Guest Name- Property (cart tag)`. The portal matches the property name (and aliases in [`config/cart-aliases.json`](config/cart-aliases.json)) to a Hostaway listing, then shows that rental on the house page as its own calendar lane. Cart tags such as `(19)` are the cart, not the stay property; a known cart owner is used only as a fallback or additional house. Duplicate events across the two calendars are merged. The preview/mock feed still uses the unit tags in [`config/cart-tags.json`](config/cart-tags.json).
 
-| Tag in the title | House |
-| --- | --- |
-| `(A)` | Peaceful Pearl |
-| `(Donald's)` | Peaceful Pearl |
-| `(7A)` | Porter Vibe |
-| `(19)` | Porter Pulse #19 |
-
-Curly apostrophes in `(Donald's)` still match. `(7A)` is not treated as `(A)`. Edit the mapping in [`config/cart-tags.json`](config/cart-tags.json). Events with no tag are skipped, and the admin page counts them.
-
-In Google Calendar, open **STR Golf Cart Rentals → Settings and sharing → Integrate calendar**, and copy the **Secret address in iCal format**. Put it in `.env.local`:
+In Google Calendar, open each golf cart calendar → **Settings and sharing → Integrate calendar**, and copy the **Secret address in iCal format**. Put both in `.env.local` (and in Netlify for production):
 
 ```bash
-GOLF_CART_ICS_URL=https://calendar.google.com/calendar/ical/.../basic.ics
+GOLF_CART_ICS_URLS=https://calendar.google.com/calendar/ical/.../basic.ics,https://calendar.google.com/calendar/ical/.../basic.ics
 ```
 
-That URL is a secret. Do not commit it. With `DATA_MODE=live`, the portal reads the feed. With `DATA_MODE=mock`, it parses a built-in sample through the same iCal code.
+Those URLs are secrets. Do not commit them. Public iCal addresses are not available. With `DATA_MODE=live`, the portal reads the feeds. With `DATA_MODE=mock`, it parses a built-in sample through the same iCal code.
 
 All-day events use the iCal rule that the end date is exclusive. Timed events are shown on the Central-time dates they cover.
 

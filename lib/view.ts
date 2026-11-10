@@ -1,4 +1,5 @@
 import { tagsForListing, type PublicAccount, type Unit } from "@/lib/catalog";
+import { bookingUrlFor, welcomeGuideUrlFor } from "@/lib/listing-links";
 import {
   addDays,
   daysInMonth,
@@ -24,6 +25,8 @@ export type UnitView = {
   tags: string[];
   hasGolfCart: boolean;
   hostawayLinked: boolean | null;
+  bookingUrl: string | null;
+  welcomeGuideUrl: string | null;
 };
 
 export type PortalView = {
@@ -71,8 +74,10 @@ function toUnitView(unit: Unit, snapshot: Snapshot): UnitView {
     town: unit.town,
     bedrooms: unit.bedrooms,
     tags,
-    hasGolfCart: tags.length > 0,
+    hasGolfCart: tags.length > 0 || snapshot.carts.some((cart) => cart.unitId === unit.id),
     hostawayLinked: snapshot.source === "live" ? (snapshot.matchedUnitIds?.includes(unit.id) ?? false) : null,
+    bookingUrl: bookingUrlFor(unit),
+    welcomeGuideUrl: welcomeGuideUrlFor(unit),
   };
 }
 

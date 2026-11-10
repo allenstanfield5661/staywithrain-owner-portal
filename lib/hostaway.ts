@@ -24,6 +24,8 @@ type HostawayListing = {
   name?: string;
   internalListingName?: string;
   city?: string | null;
+  street?: string | null;
+  address?: string | null;
   bedroomsNumber?: number | null;
 };
 
@@ -331,15 +333,32 @@ async function fetchPaged(
   return assemblePages(byOffset, failed, count);
 }
 
+function uniqueAliases(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const aliases: string[] = [];
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    aliases.push(trimmed);
+  }
+  return aliases;
+}
+
 export function listingToUnit(listing: HostawayListing): Unit | null {
   if (listing.id == null) return null;
   const bedrooms = Number(listing.bedroomsNumber);
+  const name = listing.name || listing.internalListingName || `Listing ${listing.id}`;
+  const aliases = uniqueAliases([listing.internalListingName, listing.street, listing.address]);
   return {
     id: String(listing.id),
-    name: listing.name || listing.internalListingName || `Listing ${listing.id}`,
+    name,
     town: listing.city?.trim() || "Mississippi Gulf Coast",
     bedrooms: Number.isFinite(bedrooms) && bedrooms > 0 ? bedrooms : 1,
     hostawayListingId: Number(listing.id),
+    aliases: aliases.filter((alias) => alias.toLowerCase() !== name.toLowerCase()),
   };
 }
 

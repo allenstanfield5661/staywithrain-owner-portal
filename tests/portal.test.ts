@@ -3,7 +3,9 @@ import { listTagMappings, listUnits, ownerAccounts, toPublicAccount, listAccount
 import { barsForWeek } from "@/lib/calendar-layout";
 import { addDays, eachNight, reportingMonths, windowMonths } from "@/lib/dates";
 import { matchListing, mapHostawayReservation } from "@/lib/hostaway";
-import { matchTag, parseIcs } from "@/lib/ics";
+import { assignCartEvent, dedupeCarts, golfCartFeedUrls, parseCartTitle } from "@/lib/cart-match";
+import { matchTag, parseIcs, parseIcsForUnits } from "@/lib/ics";
+import { bookingUrlFor, welcomeGuideUrlFor } from "@/lib/listing-links";
 import { buildMockIcs, buildMockStays, buildRawMockStays } from "@/lib/mock-source";
 import { occupancyForMonth } from "@/lib/occupancy";
 import { redactEventLabel, redactGuestName } from "@/lib/privacy";
@@ -292,5 +294,118 @@ describe("owners", () => {
       "James Okonkwo",
       "Priya Nandakumar",
     ]);
+  });
+});
+
+
+describe("listing links", () => {
+  it("builds a booking URL only for listings that are on the booking site", () => {
+    expect(bookingUrlFor({ id: "516343", hostawayListingId: 516343 })).toBe(
+      "https://staywithrain.thebookingportal.com/listings/516343",
+    );
+    expect(bookingUrlFor({ id: "peaceful-pearl", hostawayListingId: null })).toBeNull();
+    expect(bookingUrlFor({ id: "484258", hostawayListingId: 484258 })).toBeNull();
+    expect(bookingUrlFor({ id: "484261" })).toBeNull();
+  });
+
+  it("returns a welcome guide only when a shared public link is on file", () => {
+    expect(welcomeGuideUrlFor({ id: "484242" })).toBe("https://canva.link/36wbqkf34nnlz27");
+    expect(welcomeGuideUrlFor({ id: "484246", hostawayListingId: 484246 })).toBeNull();
+    expect(welcomeGuideUrlFor({ id: "peaceful-pearl", hostawayListingId: null })).toBeNull();
+  });
+});
+
+describe("golf cart property matching", () => {
+  const units = [
+    { id: "484242", name: "Picture book cottage!", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484242, aliases: ["2207 Government St @21"] },
+    { id: "484245", name: "Porter Bloom Pool + Prime Spot", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484245, aliases: ["114 Ethel Cir #21"] },
+    { id: "484255", name: "The Porter Clause", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484255, aliases: ["Porter 38"] },
+    { id: "484246", name: "Marée Maison  Downtown OS Oasis", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 484246, aliases: ["1010 Calhoun"] },
+    { id: "494975", name: "The Meridian | Walkable. Coastal. Elevated.", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 494975, aliases: ["The Porches at Forest Hills"] },
+    { id: "520706", name: "Curt’s Cottage | Coastal Oak Park Stay", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 520706 },
+    { id: "579762", name: "The Downtown Canopy | Walk to Everything + Garage", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 579762, aliases: ["Oasis on Desoto"] },
+    { id: "597423", name: "Porter Pulse", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 597423, aliases: ["Ethel Circle #unit 19"] },
+  ];
+
+  it("parses guest, property, and cart tag from live titles", () => {
+    expect(parseCartTitle("Erek Rhinewalt- Porter 21 (19)")).toEqual({
+      guest: "Erek Rhinewalt",
+      property: "Porter 21",
+      tag: "(19)",
+    });
+    expect(parseCartTitle("Rented: Marilyn and Ric Wilson (Porter Pulse)")).toEqual({
+      guest: "Marilyn and Ric Wilson",
+      property: "Porter Pulse",
+      tag: "",
+    });
+  });
+
+  it("matches rentals to the stay property and also to a known cart owner", () => {
+    const bloom = assignCartEvent("Erek Rhinewalt- Porter 21 (19)", units);
+    expect(bloom?.label).toBe("Erek R.");
+    expect(bloom?.unitIds).toEqual(["484245", "597423"]);
+    expect(assignCartEvent("Emily Brown- Porter 38 (7)", units)?.unitIds).toEqual(["484255"]);
+    expect(assignCartEvent("Mickey Fowler- Porches (A)", units)?.unitIds).toEqual(["494975"]);
+    expect(assignCartEvent("Cathy Cashman- Oasis on Desoto (11)", units)?.unitIds).toEqual(["579762"]);
+    expect(assignCartEvent("Allison Hendrix- Curt's Cottage (A)", units)?.unitIds).toEqual(["520706"]);
+    expect(assignCartEvent("Shane Sommers- 1010 Calhoun (A)", units)?.unitIds).toEqual(["484246"]);
+    expect(assignCartEvent("Crystal Thibodeaux- CAOP 21 (11)", units)?.unitIds).toEqual(["484242"]);
+    expect(assignCartEvent("Marilyn and Ric Wilson- Porter Pulse (19)", units)?.unitIds).toEqual(["597423"]);
+    expect(assignCartEvent("Heather Sutton- Porches", units)?.unitIds).toEqual(["494975"]);
+    expect(assignCartEvent("Gulf Coast Road Trip", units)).toBeNull();
+  });
+
+  it("parses a live feed by property name and drops a synced duplicate", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "X-WR-CALNAME:STR Golf Cart Rentals",
+      "BEGIN:VEVENT",
+      "UID:str-erek",
+      "DTSTART;VALUE=DATE:20261106",
+      "DTEND;VALUE=DATE:20261108",
+      "SUMMARY:Erek Rhinewalt- Porter 21 (19)",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:skip-meeting",
+      "DTSTART;VALUE=DATE:20261110",
+      "DTEND;VALUE=DATE:20261111",
+      "SUMMARY:Gulf Coast Road Trip",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const synced = [
+      "BEGIN:VCALENDAR",
+      "X-WR-CALNAME:Subedi Realty Golf Cart",
+      "BEGIN:VEVENT",
+      "UID:subedi-erek",
+      "DTSTART;VALUE=DATE:20261106",
+      "DTEND;VALUE=DATE:20261108",
+      "SUMMARY:Rented: Erek Rhinewalt (Porter 21)",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const combined = dedupeCarts([...parseIcsForUnits(ics, units).events, ...parseIcsForUnits(synced, units).events]);
+    const bloom = combined.filter((event) => event.unitId === "484245");
+    const pulse = combined.filter((event) => event.unitId === "597423");
+    expect(bloom).toHaveLength(1);
+    expect(pulse).toHaveLength(1);
+    expect(bloom[0]).toMatchObject({ label: "Erek R.", start: "2026-11-06", end: "2026-11-08" });
+    expect(parseIcsForUnits(ics, units).unmatched).toBe(1);
+  });
+
+  it("reads one or many golf cart feed URLs without printing them", () => {
+    const previousUrls = process.env.GOLF_CART_ICS_URLS;
+    const previousUrl = process.env.GOLF_CART_ICS_URL;
+    process.env.GOLF_CART_ICS_URLS = "https://example.com/a.ics, https://example.com/b.ics";
+    process.env.GOLF_CART_ICS_URL = "https://example.com/a.ics";
+    expect(golfCartFeedUrls()).toEqual(["https://example.com/a.ics", "https://example.com/b.ics"]);
+    delete process.env.GOLF_CART_ICS_URLS;
+    expect(golfCartFeedUrls()).toEqual(["https://example.com/a.ics"]);
+    delete process.env.GOLF_CART_ICS_URL;
+    expect(golfCartFeedUrls()).toEqual([]);
+    if (previousUrls === undefined) delete process.env.GOLF_CART_ICS_URLS;
+    else process.env.GOLF_CART_ICS_URLS = previousUrls;
+    if (previousUrl === undefined) delete process.env.GOLF_CART_ICS_URL;
+    else process.env.GOLF_CART_ICS_URL = previousUrl;
   });
 });

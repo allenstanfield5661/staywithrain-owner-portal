@@ -35,13 +35,14 @@ Optional:
 
 | Name | Value |
 | --- | --- |
-| `GOLF_CART_ICS_URL` | Secret iCal URL for STR Golf Cart Rentals. The golf-cart section appears only when that feed has events for the house. |
+| `GOLF_CART_ICS_URLS` | Comma-separated secret iCal URLs for STR Golf Cart Rentals and Subedi Realty Golf Cart. The golf-cart calendar appears on a house when a rental matches that property. |
+| `GOLF_CART_ICS_URL` | Optional single-feed fallback for the same secret iCal format. |
 
 Hostaway listings and reservations are cached for 10 minutes. Owner records and password hashes are stored in Netlify Blobs.
 
 ## What owners see
 
-Shown: shortened guest name (first name and last initial), arrival, departure, nights, status, channel, and occupancy. Owner stays are on the calendar and left out of the occupancy percentage.
+Shown: shortened guest name (first name and last initial), arrival, departure, nights, status, channel, occupancy, the direct-booking link, and a welcome-guide link when one is on file. Owner stays are on the calendar and left out of the occupancy percentage. Golf cart rentals appear as their own calendar with guest and dates, without prices.
 
 Hidden: full surname, email, phone, address, prices, payouts, card details, door codes, and notes.
 

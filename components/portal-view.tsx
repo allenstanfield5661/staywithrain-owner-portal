@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MonthCalendar } from "@/components/month-calendar";
+import { PropertyLinksCard } from "@/components/property-links-card";
 import { StaysTable } from "@/components/stays-table";
 import type { CalendarEvent } from "@/lib/calendar-layout";
 import { formatMonth, formatMonthShort, formatStayDate } from "@/lib/dates";
@@ -83,7 +84,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
         <h1 className="mt-1 font-heading text-4xl tracking-tight text-sea sm:text-5xl">{selected.name}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {selected.bedrooms} bedrooms
-          {showGolf ? ` · Golf cart ${formatTags(selected.tags)}` : ""}
+          {selected.hasGolfCart || cartEvents.length > 0 ? " · Golf cart" : ""}
         </p>
         {view.inHouse ? (
           <p className="mt-4 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full bg-foam px-3 py-1.5 text-sm text-sea">
@@ -102,6 +103,12 @@ export function PortalViewBody({ view }: { view: PortalView }) {
           </p>
         ) : null}
       </div>
+
+      <PropertyLinksCard
+        bookingUrl={selected.bookingUrl}
+        welcomeGuideUrl={selected.welcomeGuideUrl}
+        propertyName={selected.name}
+      />
 
       <section aria-label="Occupancy" className="grid gap-3 sm:grid-cols-2">
         {view.occupancy.map((item) => (
@@ -136,29 +143,26 @@ export function PortalViewBody({ view }: { view: PortalView }) {
       />
 
       {showGolf ? (
-        view.cartSource === "unconfigured" ? (
-          <section className="rounded-2xl bg-card px-5 py-6 ring-1 ring-foreground/10">
-            <h2 className="font-heading text-2xl tracking-tight text-sea sm:text-3xl">Golf cart</h2>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              {view.warning ??
-                "The STR Golf Cart Rentals calendar is not connected. Add GOLF_CART_ICS_URL to show rentals tagged for this house."}
-            </p>
-          </section>
-        ) : (
-          <MonthCalendar
-            title="Golf cart"
-            description={`${formatMonth(view.month)} · STR Golf Cart Rentals · tags ${formatTags(selected.tags)}`}
-            month={view.month}
-            today={view.today}
-            events={cartEvents}
-            legend={[{ tone: "cart", label: "Cart rental" }]}
-            empty="No cart rentals this month."
-          />
-        )
+        <MonthCalendar
+          title="Golf cart"
+          description={`${formatMonth(view.month)} · Golf cart rentals`}
+          month={view.month}
+          today={view.today}
+          events={cartEvents}
+          legend={[{ tone: "cart", label: "Cart rental" }]}
+          empty="No cart rentals this month."
+          listEvents
+        />
       ) : null}
 
       <StaysTable stays={view.upcoming} today={view.today} />
 
+      {view.account.role === "admin" && view.source === "live" && view.cartSource === "unconfigured" ? (
+        <p className="text-sm text-muted-foreground">
+          Golf cart calendars are not connected. Add GOLF_CART_ICS_URLS with the secret iCal addresses for STR Golf Cart
+          Rentals and Subedi Realty Golf Cart.
+        </p>
+      ) : null}
       {view.account.role === "admin" && view.warning ? (
         <p className="text-sm text-brass">{view.warning}</p>
       ) : null}
@@ -175,10 +179,4 @@ export function PortalViewBody({ view }: { view: PortalView }) {
       </footer>
     </div>
   );
-}
-
-function formatTags(tags: string[]): string {
-  if (tags.length <= 1) return tags[0] ?? "";
-  if (tags.length === 2) return `${tags[0]} and ${tags[1]}`;
-  return `${tags.slice(0, -1).join(", ")}, and ${tags[tags.length - 1]}`;
 }

@@ -26,6 +26,7 @@ export type Unit = {
   town: string;
   bedrooms: number;
   hostawayListingId: number | null;
+  aliases?: string[];
 };
 
 export type TagMapping = {
