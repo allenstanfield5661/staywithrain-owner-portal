@@ -8,7 +8,12 @@ export const maxDuration = 8;
 
 export async function GET() {
   try {
-    const account = await getAccount();
+    let account;
+    try {
+      account = await getAccount();
+    } catch {
+      return NextResponse.json({ ok: false, error: "Admin sign-in required." }, { status: 401 });
+    }
     if (!account || account.role !== "admin") {
       return NextResponse.json({ ok: false, error: "Admin sign-in required." }, { status: 401 });
     }

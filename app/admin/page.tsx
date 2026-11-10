@@ -1,13 +1,23 @@
+import { Suspense } from "react";
 import { AssignmentEditor } from "@/components/assignment-editor";
 import { AdminOwnersPanel } from "@/components/admin-owners-panel";
 import { PortalShell } from "@/components/portal-shell";
+import { PortalSkeleton } from "@/components/portal-skeleton";
 import { readAssignments } from "@/lib/assignments";
 import { requireAdmin } from "@/lib/auth";
 import { listUnits, ownerAccounts, toPublicAccount } from "@/lib/catalog";
 import { GULF_TZ, reportingMonths, todayInTimeZone, windowMonths } from "@/lib/dates";
 import { dataMode } from "@/lib/snapshot";
 
-export default async function AdminPage() {
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<PortalSkeleton />}>
+      <AdminContent />
+    </Suspense>
+  );
+}
+
+async function AdminContent() {
   const account = await requireAdmin();
   const publicAccount = toPublicAccount(account);
   const mode = dataMode();

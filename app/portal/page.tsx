@@ -1,10 +1,24 @@
+import { Suspense } from "react";
 import { PortalCalendar } from "@/components/portal-calendar";
 import { PortalShell } from "@/components/portal-shell";
+import { PortalSkeleton } from "@/components/portal-skeleton";
 import { requireAccount } from "@/lib/auth";
 import { toPublicAccount } from "@/lib/catalog";
 import { dataMode } from "@/lib/snapshot";
 
-export default async function PortalPage({
+export default function PortalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string | string[]; month?: string | string[] }>;
+}) {
+  return (
+    <Suspense fallback={<PortalSkeleton />}>
+      <PortalContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function PortalContent({
   searchParams,
 }: {
   searchParams: Promise<{ unit?: string | string[]; month?: string | string[] }>;

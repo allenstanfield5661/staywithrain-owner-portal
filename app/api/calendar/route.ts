@@ -12,7 +12,12 @@ export const maxDuration = 8;
 export async function GET(request: Request) {
   const started = Date.now();
   try {
-    const account = await getAccount();
+    let account;
+    try {
+      account = await getAccount();
+    } catch {
+      return NextResponse.json({ ok: false, error: "Sign in required." }, { status: 401 });
+    }
     if (!account) {
       return NextResponse.json({ ok: false, error: "Sign in required." }, { status: 401 });
     }
