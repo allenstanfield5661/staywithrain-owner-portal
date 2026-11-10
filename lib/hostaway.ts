@@ -158,20 +158,30 @@ async function fetchLiveCalendar(windowStart: string, windowEnd: string): Promis
   });
   const arrivalStart = addDays(windowStart, -120);
   const stays: PublicStay[] = [];
-  for (const unit of units) {
-    const reservations = (await fetchPaged("/reservations", token, {
-      listingId: unit.id,
-      arrivalStartDate: arrivalStart,
-      arrivalEndDate: windowEnd,
-    })) as HostawayReservation[];
-    for (const reservation of reservations) {
-      if (String(reservation.listingMapId ?? "") !== unit.id) continue;
-      const stay = mapHostawayReservation(reservation, unit.id);
-      if (!stay) continue;
-      if (stay.departure <= windowStart || stay.arrival >= windowEnd) continue;
-      stays.push(stay);
+  const perUnit: PublicStay[][] = new Array(units.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < units.length) {
+      const index = next++;
+      const unit = units[index];
+      const reservations = (await fetchPaged("/reservations", token, {
+        listingId: unit.id,
+        arrivalStartDate: arrivalStart,
+        arrivalEndDate: windowEnd,
+      })) as HostawayReservation[];
+      const found: PublicStay[] = [];
+      for (const reservation of reservations) {
+        if (String(reservation.listingMapId ?? "") !== unit.id) continue;
+        const stay = mapHostawayReservation(reservation, unit.id);
+        if (!stay) continue;
+        if (stay.departure <= windowStart || stay.arrival >= windowEnd) continue;
+        found.push(stay);
+      }
+      perUnit[index] = found;
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(10, units.length) }, worker));
+  for (const found of perUnit) if (found) stays.push(...found);
   return { stays, units };
 }
 
