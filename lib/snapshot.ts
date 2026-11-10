@@ -1,4 +1,3 @@
-import { io } from "next/cache";
 import { expectedCalendarName, listTagMappings, listUnits, normalizeName, type Unit } from "@/lib/catalog";
 import { dataMode, type DataSource } from "@/lib/data-mode";
 import { addDays, daysInMonth, GULF_TZ, isoDate, parseISODate, todayInTimeZone, windowMonths } from "@/lib/dates";
@@ -6,6 +5,7 @@ import { loadLiveCalendar } from "@/lib/hostaway";
 import { parseIcs, type ParsedCart } from "@/lib/ics";
 import { buildMockIcs, buildMockStays } from "@/lib/mock-source";
 import type { PublicStay } from "@/lib/stays";
+import { CACHE_TTL_MS, peek, remember } from "@/lib/timed-cache";
 
 export type { DataSource };
 export { dataMode };
@@ -36,41 +36,63 @@ function overlaps(start: string, end: string, windowStart: string, windowEnd: st
   return start < windowEnd && end > windowStart;
 }
 
-export async function loadSnapshot(now?: Date): Promise<Snapshot> {
-  await io();
-  const clock = now ?? new Date();
-  const fetchedAt = clock.toISOString();
-  const today = todayInTimeZone(GULF_TZ, clock);
-  const bounds = windowBounds(today);
-  const mode = dataMode();
+export function snapshotCacheKey(now: Date): string {
+  const bounds = windowBounds(todayInTimeZone(GULF_TZ, now));
+  return `snapshot:${bounds.start}:${bounds.end}`;
+}
 
-  if (mode === "mock") {
-    const parsed = parseIcs(buildMockIcs(), listTagMappings());
-    return {
-      fetchedAt,
-      source: "mock",
-      cartSource: "mock",
-      matchedUnitIds: null,
-      stays: buildMockStays().filter((stay) => overlaps(stay.arrival, stay.departure, bounds.start, bounds.end)),
-      carts: parsed.events.filter((event) => overlaps(event.start, event.end, bounds.start, bounds.end)),
-      unmatchedCarts: parsed.unmatched,
-    };
-  }
-
-  const { stays, units, warning } = await loadLiveCalendar(bounds.start, bounds.end);
-  const matchedUnitIds = units.map((unit) => unit.id);
-  const carts = await liveCarts(units, bounds.start, bounds.end);
+function buildMockSnapshot(now: Date): Snapshot {
+  const fetchedAt = now.toISOString();
+  const bounds = windowBounds(todayInTimeZone(GULF_TZ, now));
+  const parsed = parseIcs(buildMockIcs(), listTagMappings());
   return {
     fetchedAt,
+    source: "mock",
+    cartSource: "mock",
+    matchedUnitIds: null,
+    stays: buildMockStays().filter((stay) => overlaps(stay.arrival, stay.departure, bounds.start, bounds.end)),
+    carts: parsed.events.filter((event) => overlaps(event.start, event.end, bounds.start, bounds.end)),
+    unmatchedCarts: parsed.unmatched,
+  };
+}
+
+export async function buildSnapshot(now: Date): Promise<Snapshot> {
+  if (dataMode() === "mock") return buildMockSnapshot(now);
+  const bounds = windowBounds(todayInTimeZone(GULF_TZ, now));
+  const { stays, units, warning } = await loadLiveCalendar(bounds.start, bounds.end);
+  const carts = await liveCarts(units, bounds.start, bounds.end);
+  return {
+    fetchedAt: now.toISOString(),
     source: "live",
     cartSource: carts.cartSource,
     warning: [warning, carts.warning].filter(Boolean).join(" ") || undefined,
-    matchedUnitIds,
+    matchedUnitIds: units.map((unit) => unit.id),
     units,
     stays,
     carts: carts.events,
     unmatchedCarts: carts.unmatched,
   };
+}
+
+export async function readCachedSnapshot(now: Date = new Date()): Promise<Snapshot | null> {
+  if (dataMode() === "mock") return buildMockSnapshot(now);
+  return peek<Snapshot>(snapshotCacheKey(now));
+}
+
+export async function warmSnapshot(now: Date = new Date()): Promise<Snapshot> {
+  if (dataMode() === "mock") return buildMockSnapshot(now);
+  return remember(snapshotCacheKey(now), CACHE_TTL_MS, () => buildSnapshot(now), {
+    shouldPersist: (value) => !value.warning,
+  });
+}
+
+export async function loadSnapshot(now?: Date): Promise<Snapshot> {
+  const { io } = await import("next/cache");
+  await io();
+  const clock = now ?? new Date();
+  const cached = await readCachedSnapshot(clock);
+  if (cached) return cached;
+  return warmSnapshot(clock);
 }
 
 function retargetCarts(events: ParsedCart[], units: Unit[]): ParsedCart[] {

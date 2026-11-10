@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dataMode } from "@/lib/data-mode";
+import { BLOB_TIMEOUT_MS, withTimeout } from "@/lib/timeout";
 
 export type StoredOwner = {
   id: string;
@@ -68,7 +69,7 @@ async function readBlobOwners(): Promise<StoredOwner[] | null> {
   try {
     const { getStore } = await import("@netlify/blobs");
     const store = getStore("owner-portal");
-    const raw = await store.get("owners", { type: "text" });
+    const raw = await withTimeout(store.get("owners", { type: "text" }), BLOB_TIMEOUT_MS, "Blob read timed out");
     if (!raw) return null;
     return parseOwnersConfig(raw);
   } catch {
@@ -81,7 +82,7 @@ async function writeBlobOwners(owners: StoredOwner[]): Promise<void> {
   try {
     const { getStore } = await import("@netlify/blobs");
     const store = getStore("owner-portal");
-    await store.set("owners", JSON.stringify({ owners }));
+    await withTimeout(store.set("owners", JSON.stringify({ owners })), BLOB_TIMEOUT_MS, "Blob write timed out");
   } catch {
     // File fallback below still records the change when the disk is writable.
   }
