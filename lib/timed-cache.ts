@@ -28,7 +28,12 @@ async function writeBlob(key: string, value: string): Promise<void> {
   }
 }
 
-export async function remember<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+export async function remember<T>(
+  key: string,
+  ttlMs: number,
+  load: () => Promise<T>,
+  options?: { shouldPersist?: (value: T) => boolean },
+): Promise<T> {
   const now = Date.now();
   const cached = memory.get(key);
   if (cached && cached.expires > now) return cached.value as T;
@@ -45,6 +50,7 @@ export async function remember<T>(key: string, ttlMs: number, load: () => Promis
     }
   }
   const value = await load();
+  if (options?.shouldPersist && !options.shouldPersist(value)) return value;
   const entry = { expires: now + ttlMs, value };
   memory.set(key, entry);
   await writeBlob(key, JSON.stringify(entry));

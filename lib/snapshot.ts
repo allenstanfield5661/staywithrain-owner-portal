@@ -57,14 +57,14 @@ export async function loadSnapshot(now?: Date): Promise<Snapshot> {
     };
   }
 
-  const { stays, units } = await loadLiveCalendar(bounds.start, bounds.end);
+  const { stays, units, warning } = await loadLiveCalendar(bounds.start, bounds.end);
   const matchedUnitIds = units.map((unit) => unit.id);
   const carts = await liveCarts(units, bounds.start, bounds.end);
   return {
     fetchedAt,
     source: "live",
     cartSource: carts.cartSource,
-    warning: carts.warning,
+    warning: [warning, carts.warning].filter(Boolean).join(" ") || undefined,
     matchedUnitIds,
     units,
     stays,
