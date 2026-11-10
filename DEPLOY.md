@@ -35,8 +35,9 @@ Optional:
 
 | Name | Value |
 | --- | --- |
-| `GOLF_CART_ICS_URLS` | Comma-separated secret iCal URLs for STR Golf Cart Rentals and Subedi Realty Golf Cart. The golf-cart calendar appears on a house when a rental matches that property. |
+| `GOLF_CART_ICS_URLS` | Comma-separated secret iCal URL(s). Today this is the Subedi Realty Golf Cart feed. Cart rentals appear on the house that owns the cart tag in the event title. |
 | `GOLF_CART_ICS_URL` | Optional single-feed fallback for the same secret iCal format. |
+| `GOLF_CART_PUSH_SECRET` | Bearer secret for `POST /api/golfcart/push`. Required to accept pushed STR Golf Cart Rentals events. |
 
 Hostaway listings and reservations are cached for 10 minutes. Owner records and password hashes are stored in Netlify Blobs.
 
@@ -67,3 +68,27 @@ Paste the printed hash into `ADMIN_PASSWORD_HASH`. Do not put the password itsel
 5. The owner opens the link, sets a password, and then signs in with their email.
 
 Invite links expire after 7 days. Sign-in allows 8 attempts per email and IP every 15 minutes.
+
+## Golf cart push
+
+STR Golf Cart Rentals has no secret iCal address (edit access only). A scheduled job pushes its events every 30 minutes.
+
+- **URL:** `POST https://staywithrain.netlify.app/api/golfcart/push`
+- **Auth header:** `Authorization: Bearer <GOLF_CART_PUSH_SECRET>`
+- **Secret file (operators):** `/workspace/owner-portal-live/GOLF_CART_PUSH_SECRET.txt` (chmod 600). Never commit or print it.
+- **JSON body:** an array of events (or `{ "events": [ ... ] }`). Each event is:
+
+```json
+[
+  {
+    "calendar": "STR Golf Cart Rentals",
+    "summary": "Guest Name- Property (7A)",
+    "start": "2026-12-01",
+    "end": "2026-12-04"
+  }
+]
+```
+
+`start` / `end` are exclusive-end ISO dates (`YYYY-MM-DD`), same as all-day iCal. Each successful push **replaces** the whole STR Golf Cart Rentals set stored in Netlify Blobs (`golfcart:events`). Subedi Realty Golf Cart continues to come from `GOLF_CART_ICS_URLS`. Cart tags map to owning listings: `(19)` → Porter Pulse 597423, `(7A)` → Porter Vibe 484254, `(A)` / `(Donald's)` → Peaceful Pearl 516343, `(11)` → Porter 11 / Five by the Sea 501592. Every Subedi event is treated as cart `(19)`.
+
+Ready-to-run helper: `/workspace/owner-portal-live/push_golfcart.sh <events.json>` — prints only the HTTP status and accepted count.

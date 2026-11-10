@@ -1,4 +1,10 @@
-import { assignCartEvent, type CartAssignment } from "@/lib/cart-match";
+import {
+  assignCartEvent,
+  extractCartTag,
+  isSubediCalendar,
+  knownCartTags,
+  type CartAssignment,
+} from "@/lib/cart-match";
 import type { Unit } from "@/lib/catalog";
 import { addDays, isoDate, todayInTimeZone, GULF_TZ } from "@/lib/dates";
 import { redactEventLabel } from "@/lib/privacy";
@@ -23,6 +29,13 @@ export type ParsedCalendar = {
   unmatched: number;
 };
 
+export type PushedCartEvent = {
+  calendar?: string;
+  summary: string;
+  start: string;
+  end: string;
+};
+
 function unfold(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
 }
@@ -39,13 +52,17 @@ function normalizeApostrophes(value: string): string {
   return value.normalize("NFKC").replace(/[’‘ʼ]/g, "'");
 }
 
+/** Exact tag match: only full parenthetical groups count, longest tags first. */
 export function matchTag(summary: string, mappings: TagMapping[]): TagMapping | null {
-  const haystack = normalizeApostrophes(summary).toLowerCase();
-  const ordered = [...mappings].sort((a, b) => b.tag.length - a.tag.length);
-  for (const mapping of ordered) {
-    if (haystack.includes(normalizeApostrophes(mapping.tag).toLowerCase())) return mapping;
-  }
-  return null;
+  const tag = extractCartTag(
+    summary,
+    mappings.map((mapping) => mapping.tag),
+  );
+  if (!tag) return null;
+  const needle = normalizeApostrophes(tag).toLowerCase();
+  return (
+    mappings.find((mapping) => normalizeApostrophes(mapping.tag).toLowerCase() === needle) ?? null
+  );
 }
 
 type Prop = { value: string; params: string };
@@ -168,9 +185,50 @@ export function parseIcs(ics: string, mappings: TagMapping[]): ParsedCalendar {
   });
 }
 
-/** Match cart rentals to listings by the property name in the title, then by a known cart owner. */
+/** Match cart rentals by the cart TAG in the title. Subedi Realty Golf Cart events are always cart (19). */
 export function parseIcsForUnits(ics: string, units: Unit[]): ParsedCalendar {
-  return parseIcsWithAssigner(ics, (summary) => assignCartEvent(summary, units) as CartAssignment | null);
+  const text = unfold(ics);
+  const nameMatch = /X-WR-CALNAME:(.*)/i.exec(text);
+  const calendarName = nameMatch ? unescapeText(nameMatch[1].trim()) : null;
+  const subedi = isSubediCalendar(calendarName);
+  return parseIcsWithAssigner(ics, (summary) => {
+    const options = subedi ? { forceTag: "(19)" } : undefined;
+    return assignCartEvent(summary, units, options) as CartAssignment | null;
+  });
+}
+
+/** Turn a pushed JSON event list into parsed cart rentals using the same tag rules. */
+export function parsePushedCartEvents(raw: PushedCartEvent[], units: Unit[]): ParsedCalendar {
+  const events: ParsedCart[] = [];
+  let unmatched = 0;
+  let calendarName: string | null = null;
+  raw.forEach((item, index) => {
+    const summary = String(item.summary ?? "").trim();
+    const start = String(item.start ?? "").trim();
+    const end = String(item.end ?? "").trim();
+    if (item.calendar && !calendarName) calendarName = String(item.calendar);
+    if (!summary || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || !(start < end)) {
+      unmatched += 1;
+      return;
+    }
+    const subedi = isSubediCalendar(item.calendar);
+    const assignment = assignCartEvent(summary, units, subedi ? { forceTag: "(19)" } : undefined);
+    if (!assignment || assignment.unitIds.length === 0) {
+      unmatched += 1;
+      return;
+    }
+    for (const unitId of assignment.unitIds) {
+      events.push({
+        id: `push-${index}-${unitId}-${start}`,
+        unitId,
+        tag: assignment.tag,
+        label: assignment.label,
+        start,
+        end,
+      });
+    }
+  });
+  return { calendarName: calendarName ?? "STR Golf Cart Rentals", events, unmatched };
 }
 
 export function escapeIcsText(value: string): string {
@@ -205,3 +263,6 @@ export function renderIcs(
   lines.push("END:VCALENDAR");
   return lines.join("\r\n");
 }
+
+// Re-export for tests that probe known tags.
+export { knownCartTags };

@@ -1,3 +1,4 @@
+import { cartTagsForUnit } from "@/lib/cart-match";
 import { tagsForListing, type PublicAccount, type Unit } from "@/lib/catalog";
 import { bookingUrlFor, welcomeGuideUrlFor } from "@/lib/listing-links";
 import {
@@ -67,7 +68,7 @@ function overlaps(start: string, end: string, windowStart: string, windowEnd: st
 }
 
 function toUnitView(unit: Unit, snapshot: Snapshot): UnitView {
-  const tags = tagsForListing(unit);
+  const tags = [...new Set([...tagsForListing(unit), ...cartTagsForUnit(unit)])];
   return {
     id: unit.id,
     name: unit.name,

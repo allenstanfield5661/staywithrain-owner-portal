@@ -77,15 +77,16 @@ Live mode does not fall back to the sample guests. If Hostaway rejects the crede
 
 ## Plug in the golf-cart calendar
 
-Live cart rentals come from two Google calendars: **STR Golf Cart Rentals** and **Subedi Realty Golf Cart**. Event titles look like `Guest Name- Property (cart tag)`. The portal matches the property name (and aliases in [`config/cart-aliases.json`](config/cart-aliases.json)) to a Hostaway listing, then shows that rental on the house page as its own calendar lane. Cart tags such as `(19)` are the cart, not the stay property; a known cart owner is used only as a fallback or additional house. Duplicate events across the two calendars are merged. The preview/mock feed still uses the unit tags in [`config/cart-tags.json`](config/cart-tags.json).
+Live cart rentals come from **Subedi Realty Golf Cart** (secret iCal in `GOLF_CART_ICS_URLS`) and from **STR Golf Cart Rentals** events pushed to `POST /api/golfcart/push`. Event titles look like `Guest Name- Property (cart tag)`. The portal assigns each rental to the house that **owns the cart tag** (`config/cart-aliases.json` → `cartOwners`): `(19)` Porter Pulse, `(7A)` Porter Vibe, `(A)` / `(Donald's)` Peaceful Pearl, `(11)` Porter 11 / Five by the Sea. Every Subedi event is cart `(19)`. Duplicate events are merged. The preview/mock feed still uses the unit tags in [`config/cart-tags.json`](config/cart-tags.json).
 
-In Google Calendar, open each golf cart calendar → **Settings and sharing → Integrate calendar**, and copy the **Secret address in iCal format**. Put both in `.env.local` (and in Netlify for production):
+In Google Calendar, open the Subedi golf cart calendar → **Settings and sharing → Integrate calendar**, and copy the **Secret address in iCal format**. Put it in `.env.local` (and in Netlify for production):
 
 ```bash
-GOLF_CART_ICS_URLS=https://calendar.google.com/calendar/ical/.../basic.ics,https://calendar.google.com/calendar/ical/.../basic.ics
+GOLF_CART_ICS_URLS=https://calendar.google.com/calendar/ical/.../basic.ics
+GOLF_CART_PUSH_SECRET=long-random-string
 ```
 
-Those URLs are secrets. Do not commit them. Public iCal addresses are not available. With `DATA_MODE=live`, the portal reads the feeds. With `DATA_MODE=mock`, it parses a built-in sample through the same iCal code.
+Those values are secrets. Do not commit them. See `DEPLOY.md` → **Golf cart push** for the JSON push shape. With `DATA_MODE=live`, the portal reads the feed and any pushed events. With `DATA_MODE=mock`, it parses a built-in sample through the same iCal code.
 
 All-day events use the iCal rule that the end date is exclusive. Timed events are shown on the Central-time dates they cover.
 

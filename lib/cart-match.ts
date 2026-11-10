@@ -1,5 +1,5 @@
 import cartAliasesJson from "@/config/cart-aliases.json";
-import { normalizeName, type Unit } from "@/lib/catalog";
+import { listTagMappings, normalizeName, type TagMapping, type Unit } from "@/lib/catalog";
 import { redactEventLabel, redactGuestName } from "@/lib/privacy";
 
 type CartAliasesConfig = {
@@ -23,10 +23,49 @@ export type CartAssignment = {
 
 const SKIP_TITLES = /\b(road trip|meeting|staff|internal|maintenance|shop)\b/i;
 
+/** Known cart tags, longest first so (7A) wins over (A). */
+export function knownCartTags(): string[] {
+  const tags = new Set<string>();
+  for (const tag of Object.keys(config.cartOwners ?? {})) tags.add(tag);
+  for (const mapping of listTagMappings()) tags.add(mapping.tag);
+  return [...tags].sort((a, b) => b.length - a.length);
+}
+
+export function cartOwnerTagMappings(): TagMapping[] {
+  return Object.entries(config.cartOwners ?? {}).map(([tag, unitId]) => ({ tag, unitId }));
+}
+
+function normalizeTag(tag: string): string {
+  return tag.normalize("NFKC").replace(/[’‘ʼ]/g, "'").toLowerCase();
+}
+
 function isCartTag(inner: string): boolean {
   const value = inner.trim();
   if (!value || value.length > 16) return false;
+  const known = knownCartTags().some((tag) => normalizeTag(tag) === normalizeTag(`(${value})`));
+  if (known) return true;
   return /^(?:[A-Za-z]|[A-Za-z]?\d+[A-Za-z]?|Donald'?s)$/i.test(value);
+}
+
+/**
+ * Exact cart-tag match from parentheticals in the title.
+ * Compares full "(…)" groups so "(7A)" never counts as "(A)".
+ */
+export function extractCartTag(summary: string, tags: string[] = knownCartTags()): string | null {
+  const haystack = summary.normalize("NFKC").replace(/[’‘ʼ]/g, "'");
+  const found: string[] = [];
+  const re = /\(([^)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(haystack))) {
+    found.push(`(${match[1]})`);
+  }
+  if (found.length === 0) return null;
+  const ordered = [...tags].sort((a, b) => b.length - a.length);
+  for (const tag of ordered) {
+    const needle = normalizeTag(tag);
+    if (found.some((item) => normalizeTag(item) === needle)) return tag;
+  }
+  return null;
 }
 
 export function parseCartTitle(summary: string): CartTitle {
@@ -36,6 +75,9 @@ export function parseCartTitle(summary: string): CartTitle {
   const trailing = /\(([^)]+)\)\s*$/.exec(rest);
   if (trailing && isCartTag(trailing[1])) {
     tag = `(${trailing[1]})`;
+    // Normalize Donald's apostrophe to the canonical cartOwners key when present.
+    const canonical = knownCartTags().find((item) => normalizeTag(item) === normalizeTag(tag));
+    if (canonical) tag = canonical;
     rest = rest.slice(0, trailing.index).trim();
   }
   const parenProp = /^(.+?)\s*\((.+)\)$/.exec(rest);
@@ -65,42 +107,38 @@ export function namesForUnit(unit: Unit, extra: string[] = []): string[] {
   return unique([unit.name, ...(unit.aliases ?? []), ...extra]);
 }
 
-type Candidate = { unitId: string; alias: string; score: number };
-
-function collectCandidates(property: string, units: Unit[]): Candidate[] {
-  const needle = normalizeName(property);
-  if (!needle) return [];
-  const candidates: Candidate[] = [];
-  for (const unit of units) {
-    const extras = config.aliases?.[unit.id] ?? config.aliases?.[String(unit.hostawayListingId ?? "")] ?? [];
-    for (const alias of namesForUnit(unit, extras)) {
-      const key = normalizeName(alias);
-      if (!key || key.length < 4) continue;
-      if (needle === key) {
-        candidates.push({ unitId: unit.id, alias, score: 1000 + key.length });
-      } else if (needle.includes(key) || (key.includes(needle) && needle.length >= 8)) {
-        candidates.push({ unitId: unit.id, alias, score: key.length });
-      }
-    }
-  }
-  candidates.sort((a, b) => b.score - a.score);
-  return candidates;
-}
-
-export function matchPropertyToUnits(property: string, units: Unit[]): string[] {
-  const candidates = collectCandidates(property, units);
-  if (candidates.length === 0) return [];
-  const best = candidates[0].score;
-  const ids = unique(candidates.filter((item) => item.score === best).map((item) => item.unitId));
-  return ids.length === 1 ? ids : [];
-}
-
 export function cartOwnerUnitId(tag: string, units: Unit[]): string | null {
   if (!tag) return null;
-  const owner = config.cartOwners?.[tag];
-  if (!owner) return null;
-  const unit = units.find((item) => item.id === owner || String(item.hostawayListingId ?? "") === owner);
-  return unit?.id ?? null;
+  const owner = config.cartOwners?.[tag] ?? config.cartOwners?.[normalizeTag(tag)];
+  // Also try canonical key match for curly apostrophes.
+  let ownerId = owner;
+  if (!ownerId) {
+    const key = Object.keys(config.cartOwners ?? {}).find((item) => normalizeTag(item) === normalizeTag(tag));
+    if (key) ownerId = config.cartOwners?.[key];
+  }
+  if (ownerId) {
+    const unit = units.find((item) => item.id === ownerId || String(item.hostawayListingId ?? "") === ownerId);
+    if (unit) return unit.id;
+    // Live units use the listing id as unit.id; allow the listing id even before units load.
+    return ownerId;
+  }
+  const mapping = listTagMappings().find((item) => normalizeTag(item.tag) === normalizeTag(tag));
+  if (!mapping) return null;
+  const mock = units.find((item) => item.id === mapping.unitId);
+  return mock?.id ?? mapping.unitId;
+}
+
+export function cartTagsForUnit(unit: Unit): string[] {
+  const listingIds = new Set(
+    [unit.id, unit.hostawayListingId != null ? String(unit.hostawayListingId) : ""]
+      .filter(Boolean)
+      .map(String),
+  );
+  const tags: string[] = [];
+  for (const [tag, owner] of Object.entries(config.cartOwners ?? {})) {
+    if (listingIds.has(owner)) tags.push(tag);
+  }
+  return tags;
 }
 
 export function labelForCartTitle(title: CartTitle, summary: string): string {
@@ -111,18 +149,35 @@ export function labelForCartTitle(title: CartTitle, summary: string): string {
   return redactEventLabel(summary, title.tag || "\0");
 }
 
-export function assignCartEvent(summary: string, units: Unit[]): CartAssignment | null {
+/**
+ * Match a cart rental to the owning house by the cart TAG in the title.
+ * Property names in the title are ignored for assignment.
+ */
+export function assignCartEvent(
+  summary: string,
+  units: Unit[],
+  options?: { defaultTag?: string; forceTag?: string },
+): CartAssignment | null {
   const cleaned = summary.normalize("NFKC").replace(/[’‘ʼ]/g, "'").trim();
   if (!cleaned || SKIP_TITLES.test(cleaned)) return null;
   const title = parseCartTitle(cleaned);
-  const fromProperty = title.property ? matchPropertyToUnits(title.property, units) : [];
-  const ownerId = cartOwnerUnitId(title.tag, units);
-  const unitIds = unique([...fromProperty, ...(ownerId && !fromProperty.includes(ownerId) ? [ownerId] : [])]);
-  if (unitIds.length === 0) return null;
-  return { unitIds, tag: title.tag, label: labelForCartTitle(title, cleaned) };
+  let tag = options?.forceTag || title.tag || extractCartTag(cleaned) || options?.defaultTag || "";
+  if (tag) {
+    const canonical = knownCartTags().find((item) => normalizeTag(item) === normalizeTag(tag));
+    if (canonical) tag = canonical;
+  }
+  if (!tag) return null;
+  const ownerId = cartOwnerUnitId(tag, units);
+  if (!ownerId) return null;
+  // Prefer a unit that is present in the provided list.
+  const present = units.find((item) => item.id === ownerId || String(item.hostawayListingId ?? "") === ownerId);
+  const unitId = present?.id ?? ownerId;
+  return { unitIds: [unitId], tag, label: labelForCartTitle({ ...title, tag }, cleaned) };
 }
 
-export function dedupeCarts<T extends { id: string; unitId: string; label: string; start: string; end: string }>(events: T[]): T[] {
+export function dedupeCarts<T extends { id: string; unitId: string; label: string; start: string; end: string }>(
+  events: T[],
+): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const event of events) {
@@ -143,4 +198,8 @@ export function golfCartFeedUrls(): string[] {
   }
   if (single && !collected.includes(single)) collected.push(single);
   return collected;
+}
+
+export function isSubediCalendar(name: string | null | undefined): boolean {
+  return Boolean(name && /subedi/i.test(name));
 }

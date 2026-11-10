@@ -159,8 +159,8 @@ export function PortalViewBody({ view }: { view: PortalView }) {
 
       {view.account.role === "admin" && view.source === "live" && view.cartSource === "unconfigured" ? (
         <p className="text-sm text-muted-foreground">
-          Golf cart calendars are not connected. Add GOLF_CART_ICS_URLS with the secret iCal addresses for STR Golf Cart
-          Rentals and Subedi Realty Golf Cart.
+          Golf cart calendars are not connected. Add GOLF_CART_ICS_URLS for Subedi Realty Golf Cart, and/or push STR Golf
+          Cart Rentals events to /api/golfcart/push.
         </p>
       ) : null}
       {view.account.role === "admin" && view.warning ? (
@@ -168,7 +168,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
       ) : null}
       {view.account.role === "admin" && view.unmatchedCarts > 0 ? (
         <p className="text-sm text-muted-foreground">
-          {view.unmatchedCarts} golf-cart {view.unmatchedCarts === 1 ? "event was" : "events were"} skipped because the title had no unit tag.
+          {view.unmatchedCarts} golf-cart {view.unmatchedCarts === 1 ? "event was" : "events were"} skipped because the title had no cart tag.
         </p>
       ) : null}
 

@@ -2,8 +2,9 @@ import { dedupeCarts, golfCartFeedUrls } from "@/lib/cart-match";
 import { expectedCalendarName, listTagMappings, type Unit } from "@/lib/catalog";
 import { dataMode, type DataSource } from "@/lib/data-mode";
 import { addDays, daysInMonth, GULF_TZ, isoDate, parseISODate, todayInTimeZone, windowMonths } from "@/lib/dates";
+import { readPushedGolfCartEvents } from "@/lib/golfcart-store";
 import { loadLiveCalendar } from "@/lib/hostaway";
-import { parseIcs, parseIcsForUnits, type ParsedCart } from "@/lib/ics";
+import { parseIcs, parseIcsForUnits, parsePushedCartEvents, type ParsedCart } from "@/lib/ics";
 import { buildMockIcs, buildMockStays } from "@/lib/mock-source";
 import type { PublicStay } from "@/lib/stays";
 import { CACHE_TTL_MS, peekEntry, writeTimedCache } from "@/lib/timed-cache";
@@ -119,6 +120,14 @@ async function readCartFeed(url: string): Promise<{ text: string } | { failed: t
   }
 }
 
+export function cartCountsByUnit(carts: ParsedCart[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const cart of carts) {
+    counts[cart.unitId] = (counts[cart.unitId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 async function liveCarts(units: Unit[], windowStart: string, windowEnd: string): Promise<{
   events: ParsedCart[];
   unmatched: number;
@@ -126,13 +135,32 @@ async function liveCarts(units: Unit[], windowStart: string, windowEnd: string):
   warning?: string;
 }> {
   const urls = golfCartFeedUrls();
-  if (urls.length === 0) {
+  const pushedRaw = await readPushedGolfCartEvents();
+  const hasPush = pushedRaw !== null;
+  if (urls.length === 0 && !hasPush) {
     return { events: [], unmatched: 0, cartSource: "unconfigured" };
   }
+
   const results = await Promise.all(urls.map((url) => readCartFeed(url)));
   const texts = results.flatMap((result) => ("text" in result ? [result.text] : []));
   const failed = results.length - texts.length;
-  if (texts.length === 0) {
+
+  const icsParsed = texts.map((text) => parseIcsForUnits(text, units));
+  // Drop ICS events from STR Golf Cart Rentals when a push feed is present — the push replaces that set.
+  const icsEvents = icsParsed.flatMap((item) => {
+    if (hasPush && item.calendarName && /str golf cart rentals/i.test(item.calendarName)) {
+      return [];
+    }
+    return keepKnownUnits(item.events, units);
+  });
+  const pushed = parsePushedCartEvents(pushedRaw ?? [], units);
+  const events = dedupeCarts([...icsEvents, ...keepKnownUnits(pushed.events, units)]).filter((event) =>
+    overlaps(event.start, event.end, windowStart, windowEnd),
+  );
+  const unmatched =
+    icsParsed.reduce((sum, item) => sum + item.unmatched, 0) + (hasPush ? pushed.unmatched : 0);
+
+  if (texts.length === 0 && !hasPush) {
     return {
       events: [],
       unmatched: 0,
@@ -140,12 +168,8 @@ async function liveCarts(units: Unit[], windowStart: string, windowEnd: string):
       warning: failed > 1 ? "The golf cart calendars could not be read." : "The golf cart calendar could not be read.",
     };
   }
-  const parsed = texts.map((text) => parseIcsForUnits(text, units));
-  const events = dedupeCarts(parsed.flatMap((item) => keepKnownUnits(item.events, units))).filter((event) =>
-    overlaps(event.start, event.end, windowStart, windowEnd),
-  );
-  const unmatched = parsed.reduce((sum, item) => sum + item.unmatched, 0);
-  const names = parsed.map((item) => item.calendarName).filter((name): name is string => Boolean(name));
+
+  const names = icsParsed.map((item) => item.calendarName).filter((name): name is string => Boolean(name));
   const unexpected = names.filter((name) => !name.toLowerCase().includes("golf cart"));
   const warningParts: string[] = [];
   if (failed > 0) {

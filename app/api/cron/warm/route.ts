@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { warmSnapshot } from "@/lib/snapshot";
+import { cartCountsByUnit, warmSnapshot } from "@/lib/snapshot";
 
 export const maxDuration = 26;
 
@@ -20,6 +20,10 @@ export async function POST(request: Request) {
       ok: true,
       units: snapshot.units?.length ?? 0,
       stays: snapshot.stays.length,
+      carts: snapshot.carts.length,
+      cartByUnit: cartCountsByUnit(snapshot.carts),
+      unmatchedCarts: snapshot.unmatchedCarts,
+      cartSource: snapshot.cartSource,
       ms: Date.now() - started,
     };
     console.info(`cron warm ${JSON.stringify(body)}`);

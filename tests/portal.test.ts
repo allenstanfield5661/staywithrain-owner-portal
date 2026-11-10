@@ -3,8 +3,15 @@ import { listTagMappings, listUnits, ownerAccounts, toPublicAccount, listAccount
 import { barsForWeek } from "@/lib/calendar-layout";
 import { addDays, eachNight, reportingMonths, windowMonths } from "@/lib/dates";
 import { matchListing, mapHostawayReservation } from "@/lib/hostaway";
-import { assignCartEvent, dedupeCarts, golfCartFeedUrls, parseCartTitle } from "@/lib/cart-match";
-import { matchTag, parseIcs, parseIcsForUnits } from "@/lib/ics";
+import {
+  assignCartEvent,
+  cartOwnerTagMappings,
+  dedupeCarts,
+  extractCartTag,
+  golfCartFeedUrls,
+  parseCartTitle,
+} from "@/lib/cart-match";
+import { matchTag, parseIcs, parseIcsForUnits, parsePushedCartEvents } from "@/lib/ics";
 import { bookingUrlFor, welcomeGuideUrlFor } from "@/lib/listing-links";
 import { buildMockIcs, buildMockStays, buildRawMockStays } from "@/lib/mock-source";
 import { occupancyForMonth } from "@/lib/occupancy";
@@ -142,13 +149,21 @@ describe("occupancy and dates", () => {
 });
 
 describe("golf cart calendar", () => {
-  it("maps tags, including a curly apostrophe, and prefers the longer tag", () => {
+  it("maps tags, including a curly apostrophe, and matches exact parentheticals only", () => {
     const mappings = listTagMappings();
     expect(matchTag("Weekend (7A)", mappings)?.unitId).toBe("porter-vibe");
     expect(matchTag("Cart (A)", mappings)?.unitId).toBe("peaceful-pearl");
     expect(matchTag("Family (Donald\u2019s)", mappings)?.unitId).toBe("peaceful-pearl");
     expect(matchTag("(19) morning", mappings)?.unitId).toBe("porter-pulse-19");
     expect(matchTag("Shop maintenance", mappings)).toBeNull();
+    // (7A) must not be read as (A)
+    expect(extractCartTag("Guest- Porter Vibe (7A)")).toBe("(7A)");
+    expect(matchTag("Guest- Porter Vibe (7A)", mappings)?.tag).toBe("(7A)");
+    expect(matchTag("Guest- Porter Vibe (7A)", mappings)?.unitId).toBe("porter-vibe");
+    const owners = cartOwnerTagMappings();
+    expect(matchTag("Cathy- Oasis (11)", owners)?.unitId).toBe("501592");
+    expect(extractCartTag("Cathy- Oasis (11)")).toBe("(11)");
+    expect(extractCartTag("No tag here")).toBeNull();
   });
 
   it("parses all-day, timed, folded, and cancelled events", () => {
@@ -315,16 +330,13 @@ describe("listing links", () => {
   });
 });
 
-describe("golf cart property matching", () => {
+describe("golf cart tag matching", () => {
   const units = [
-    { id: "484242", name: "Picture book cottage!", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484242, aliases: ["2207 Government St @21"] },
-    { id: "484245", name: "Porter Bloom Pool + Prime Spot", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484245, aliases: ["114 Ethel Cir #21"] },
-    { id: "484255", name: "The Porter Clause", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484255, aliases: ["Porter 38"] },
-    { id: "484246", name: "Marée Maison  Downtown OS Oasis", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 484246, aliases: ["1010 Calhoun"] },
-    { id: "494975", name: "The Meridian | Walkable. Coastal. Elevated.", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 494975, aliases: ["The Porches at Forest Hills"] },
-    { id: "520706", name: "Curt’s Cottage | Coastal Oak Park Stay", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 520706 },
-    { id: "579762", name: "The Downtown Canopy | Walk to Everything + Garage", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 579762, aliases: ["Oasis on Desoto"] },
     { id: "597423", name: "Porter Pulse", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 597423, aliases: ["Ethel Circle #unit 19"] },
+    { id: "484254", name: "Porter Vibe", town: "Gulfport", bedrooms: 3, hostawayListingId: 484254, aliases: ["114 Ethel Cir #7"] },
+    { id: "516343", name: "Peaceful Pearl", town: "Ocean Springs", bedrooms: 4, hostawayListingId: 516343 },
+    { id: "501592", name: "Five by the Sea", town: "Ocean Springs", bedrooms: 3, hostawayListingId: 501592, aliases: ["Porter 11"] },
+    { id: "484245", name: "Porter Bloom Pool + Prime Spot", town: "Ocean Springs", bedrooms: 2, hostawayListingId: 484245, aliases: ["114 Ethel Cir #21"] },
   ];
 
   it("parses guest, property, and cart tag from live titles", () => {
@@ -340,22 +352,49 @@ describe("golf cart property matching", () => {
     });
   });
 
-  it("matches rentals to the stay property and also to a known cart owner", () => {
-    const bloom = assignCartEvent("Erek Rhinewalt- Porter 21 (19)", units);
-    expect(bloom?.label).toBe("Erek R.");
-    expect(bloom?.unitIds).toEqual(["484245", "597423"]);
-    expect(assignCartEvent("Emily Brown- Porter 38 (7)", units)?.unitIds).toEqual(["484255"]);
-    expect(assignCartEvent("Mickey Fowler- Porches (A)", units)?.unitIds).toEqual(["494975"]);
-    expect(assignCartEvent("Cathy Cashman- Oasis on Desoto (11)", units)?.unitIds).toEqual(["579762"]);
-    expect(assignCartEvent("Allison Hendrix- Curt's Cottage (A)", units)?.unitIds).toEqual(["520706"]);
-    expect(assignCartEvent("Shane Sommers- 1010 Calhoun (A)", units)?.unitIds).toEqual(["484246"]);
-    expect(assignCartEvent("Crystal Thibodeaux- CAOP 21 (11)", units)?.unitIds).toEqual(["484242"]);
+  it("assigns rentals to the cart-owning listing by tag only", () => {
+    const pulse = assignCartEvent("Erek Rhinewalt- Porter 21 (19)", units);
+    expect(pulse?.label).toBe("Erek R.");
+    expect(pulse?.unitIds).toEqual(["597423"]);
+    expect(assignCartEvent("Guest- Porter Vibe (7A)", units)?.unitIds).toEqual(["484254"]);
+    expect(assignCartEvent("Mickey Fowler- Porches (A)", units)?.unitIds).toEqual(["516343"]);
+    expect(assignCartEvent("Family weekend (Donald's)", units)?.unitIds).toEqual(["516343"]);
+    expect(assignCartEvent("Cathy Cashman- Oasis on Desoto (11)", units)?.unitIds).toEqual(["501592"]);
     expect(assignCartEvent("Marilyn and Ric Wilson- Porter Pulse (19)", units)?.unitIds).toEqual(["597423"]);
-    expect(assignCartEvent("Heather Sutton- Porches", units)?.unitIds).toEqual(["494975"]);
+    // No tag and not Subedi → unmatched
+    expect(assignCartEvent("Heather Sutton- Porches", units)).toBeNull();
     expect(assignCartEvent("Gulf Coast Road Trip", units)).toBeNull();
+    // (7A) is never treated as (A)
+    expect(assignCartEvent("Owen- Stay (7A)", units)?.tag).toBe("(7A)");
+    expect(assignCartEvent("Owen- Stay (7A)", units)?.unitIds).toEqual(["484254"]);
   });
 
-  it("parses a live feed by property name and drops a synced duplicate", () => {
+  it("forces Subedi Realty Golf Cart events onto cart (19) / Porter Pulse", () => {
+    const synced = [
+      "BEGIN:VCALENDAR",
+      "X-WR-CALNAME:Subedi Realty Golf Cart",
+      "BEGIN:VEVENT",
+      "UID:subedi-marilyn",
+      "DTSTART;VALUE=DATE:20261129",
+      "DTEND;VALUE=DATE:20270101",
+      "SUMMARY:Rented: Marilyn and Ric Wilson (Porter Pulse)",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:subedi-erek",
+      "DTSTART;VALUE=DATE:20261106",
+      "DTEND;VALUE=DATE:20261108",
+      "SUMMARY:Rented: Erek Rhinewalt (Porter 21)",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const parsed = parseIcsForUnits(synced, units);
+    expect(parsed.events).toHaveLength(2);
+    expect(parsed.events.every((event) => event.unitId === "597423" && event.tag === "(19)")).toBe(true);
+    const marilyn = parsed.events.find((event) => event.id === "subedi-marilyn");
+    expect(marilyn).toMatchObject({ label: "Marilyn W.", start: "2026-11-29", end: "2027-01-01" });
+  });
+
+  it("parses a tagged STR feed and dedupes a Subedi sync of the same rental", () => {
     const ics = [
       "BEGIN:VCALENDAR",
       "X-WR-CALNAME:STR Golf Cart Rentals",
@@ -385,12 +424,25 @@ describe("golf cart property matching", () => {
       "END:VCALENDAR",
     ].join("\r\n");
     const combined = dedupeCarts([...parseIcsForUnits(ics, units).events, ...parseIcsForUnits(synced, units).events]);
-    const bloom = combined.filter((event) => event.unitId === "484245");
     const pulse = combined.filter((event) => event.unitId === "597423");
-    expect(bloom).toHaveLength(1);
     expect(pulse).toHaveLength(1);
-    expect(bloom[0]).toMatchObject({ label: "Erek R.", start: "2026-11-06", end: "2026-11-08" });
+    expect(pulse[0]).toMatchObject({ label: "Erek R.", start: "2026-11-06", end: "2026-11-08", tag: "(19)" });
     expect(parseIcsForUnits(ics, units).unmatched).toBe(1);
+  });
+
+  it("parses pushed JSON events with the same tag rules", () => {
+    const parsed = parsePushedCartEvents(
+      [
+        { calendar: "STR Golf Cart Rentals", summary: "Guest Name- Stay (7A)", start: "2026-12-01", end: "2026-12-04" },
+        { calendar: "STR Golf Cart Rentals", summary: "Other- Pearl (A)", start: "2026-12-05", end: "2026-12-07" },
+        { calendar: "STR Golf Cart Rentals", summary: "No tag here", start: "2026-12-08", end: "2026-12-09" },
+      ],
+      units,
+    );
+    expect(parsed.events).toHaveLength(2);
+    expect(parsed.events.find((event) => event.tag === "(7A)")).toMatchObject({ unitId: "484254", label: "Guest N." });
+    expect(parsed.events.find((event) => event.tag === "(A)")).toMatchObject({ unitId: "516343" });
+    expect(parsed.unmatched).toBe(1);
   });
 
   it("reads one or many golf cart feed URLs without printing them", () => {
