@@ -16,7 +16,7 @@ export async function authenticate(email: string, password: string): Promise<Pub
   const adminHash = process.env.ADMIN_PASSWORD_HASH?.trim();
   if (adminEmail && needle === adminEmail) {
     if (!adminHash || !(await verifyPassword(password, adminHash))) return null;
-    return { id: "admin", name: "Rain / Stanfield", email: adminEmail, role: "admin" };
+    return { id: "admin", name: "Stay with Rain", email: adminEmail, role: "admin" };
   }
   const owner = (await loadOwners()).find((item) => item.email === needle);
   if (!owner?.passwordHash || !(await verifyPassword(password, owner.passwordHash))) return null;

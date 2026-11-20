@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { io } from "next/cache";
+import { BrandMark } from "@/components/brand-mark";
 import { LoginForm, type PreviewLogin } from "@/components/login-form";
 import { listAccounts } from "@/lib/catalog";
 import { dataMode } from "@/lib/data-mode";
@@ -34,21 +35,25 @@ async function LoginScreen({ searchParams }: { searchParams: Promise<{ password?
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <section className="bg-sea px-6 py-10 text-[#f6f3ec] sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-14">
-        <div>
-          <p className="inline-flex size-12 items-center justify-center rounded-full border border-white/30 font-heading text-sm">
-            R/S
+      <section className="relative overflow-hidden bg-sea px-6 py-12 text-white sm:px-10 lg:flex lg:flex-col lg:justify-end lg:px-12 lg:py-16">
+        <img
+          src="/brand/starburst_web_faded.png"
+          alt=""
+          className="pointer-events-none absolute -right-24 -bottom-16 w-[34rem] max-w-none select-none"
+        />
+        <div className="relative max-w-md">
+          <p className="text-xs font-medium tracking-[0.2em] text-white/75 uppercase">Owner portal</p>
+          <h1 className="mt-8">
+            <BrandMark variant="white-lockup" priority className="h-auto w-full max-w-sm" />
+          </h1>
+          <p className="mt-8 max-w-xs text-base leading-relaxed text-white/85">
+            Your calendars, upcoming stays, and occupancy, for the houses assigned to you.
           </p>
-          <h1 className="mt-8 font-heading text-5xl leading-[0.95] tracking-tight sm:text-6xl">Rain / Stanfield</h1>
-          <p className="mt-4 text-sm tracking-[0.16em] text-white/70 uppercase">Gulf Coast Mississippi</p>
         </div>
-        <p className="mt-10 max-w-sm text-lg leading-relaxed text-white/85 lg:mt-0">
-          Eight houses. Each owner sees only their own calendar, upcoming stays, and occupancy.
-        </p>
       </section>
-      <section className="flex items-center px-6 py-10 sm:px-10">
+      <section className="flex items-center bg-background px-6 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-md">
-          <h2 className="font-heading text-4xl tracking-tight text-sea">Sign in</h2>
+          <h2 className="font-heading text-4xl font-semibold tracking-tight text-sea">Sign in</h2>
           <p className="mt-2 mb-6 text-sm text-muted-foreground">
             Use the email and password on your owner account.
           </p>

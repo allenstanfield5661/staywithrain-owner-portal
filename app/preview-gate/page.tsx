@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function PreviewGatePage({
   searchParams,
@@ -18,9 +19,16 @@ async function Gate({ searchParams }: { searchParams: Promise<{ error?: string |
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="bg-sea px-6 py-12 text-[#f6f3ec] sm:px-10">
-        <p className="font-heading text-4xl tracking-tight">Rain / Stanfield</p>
-        <p className="mt-3 text-sm tracking-[0.16em] text-white/70 uppercase">Private preview</p>
+      <section className="relative overflow-hidden bg-sea px-6 py-12 text-white sm:px-10">
+        <img
+          src="/brand/starburst_web_faded.png"
+          alt=""
+          className="pointer-events-none absolute -right-16 -bottom-10 w-[24rem] max-w-none select-none"
+        />
+        <div className="relative max-w-sm">
+          <p className="text-xs font-medium tracking-[0.2em] text-white/75 uppercase">Private preview</p>
+          <BrandMark variant="white-lockup" className="mt-8 h-auto w-full" />
+        </div>
       </section>
       <section className="flex items-center px-6 py-12 sm:px-10">
         <form action="/api/preview-gate" method="post" className="mx-auto flex w-full max-w-sm flex-col gap-4">

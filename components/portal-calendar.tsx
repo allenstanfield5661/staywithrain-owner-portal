@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PortalViewBody } from "@/components/portal-view";
 import { Button } from "@/components/ui/button";
-import type { PublicAccount } from "@/lib/catalog";
+import { listUnits, type PublicAccount } from "@/lib/catalog";
 import type { Snapshot } from "@/lib/snapshot";
 import { buildPortalView, type PortalView } from "@/lib/view";
 
@@ -49,7 +49,7 @@ function writeLocalCache(cache: LocalCache): void {
 function viewFromCache(cache: LocalCache, account: PublicAccount, unit?: string, month?: string): PortalView {
   return buildPortalView({
     account,
-    units: cache.snapshot.units ?? [],
+    units: cache.snapshot.units?.length ? cache.snapshot.units : listUnits(),
     assignments: cache.assignments,
     snapshot: cache.snapshot,
     unit,

@@ -8,7 +8,7 @@ import { readSessionToken, SESSION_COOKIE } from "@/lib/session";
 function adminAccount(): Account {
   return {
     id: "admin",
-    name: "Rain / Stanfield",
+    name: "Stay with Rain",
     email: process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@rainstanfield.example",
     role: "admin",
     password: "",

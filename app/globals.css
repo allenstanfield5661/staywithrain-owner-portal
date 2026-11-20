@@ -7,16 +7,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-outfit), "Avenir Next", "Segoe UI", sans-serif;
+  --font-sans: var(--font-montserrat), "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", monospace;
-  --font-heading: var(--font-fraunces), Georgia, serif;
-  --color-sea: #1b4654;
-  --color-sea-deep: #14343f;
-  --color-foam: #e4eee8;
-  --color-brass: #8d6733;
-  --color-brass-soft: #f3e6cf;
-  --color-paper: #f3efe6;
-  --color-cart: #24543d;
+  --font-heading: var(--font-league-spartan), "Avenir Next", sans-serif;
+  --color-sea: #12384f;
+  --color-sea-deep: #0c2838;
+  --color-foam: #a9d6d3;
+  --color-brass: #d4a975;
+  --color-brass-soft: #f4d9be;
+  --color-paper: #faf7f3;
+  --color-cart: #4d4e13;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -56,24 +56,24 @@
 }
 
 :root {
-  --background: #f3efe6;
-  --foreground: #1c2430;
-  --card: #fbf9f4;
-  --card-foreground: #1c2430;
-  --popover: #fbf9f4;
-  --popover-foreground: #1c2430;
-  --primary: #1b4654;
-  --primary-foreground: #f6f3ec;
-  --secondary: #e7eee9;
-  --secondary-foreground: #1b4654;
-  --muted: #ebe4d6;
-  --muted-foreground: #5c6570;
-  --accent: #f3e6cf;
-  --accent-foreground: #1c2430;
-  --destructive: #8c3a32;
-  --border: #ddd4c4;
-  --input: #d5ccbc;
-  --ring: #1b4654;
+  --background: #faf7f3;
+  --foreground: #2b2a28;
+  --card: #ffffff;
+  --card-foreground: #2b2a28;
+  --popover: #ffffff;
+  --popover-foreground: #2b2a28;
+  --primary: #12384f;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e8e8;
+  --secondary-foreground: #12384f;
+  --muted: #f4d9be;
+  --muted-foreground: #5c5854;
+  --accent: #f4d9be;
+  --accent-foreground: #2b2a28;
+  --destructive: #9a4a18;
+  --border: #e8e8e8;
+  --input: #d5d2cc;
+  --ring: #12384f;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -133,5 +133,8 @@
   }
   html {
     @apply font-sans;
+  }
+  :where(.font-heading) {
+    font-weight: 600;
   }
 }

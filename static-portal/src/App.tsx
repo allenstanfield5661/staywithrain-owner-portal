@@ -107,8 +107,9 @@ function Gate({ onEnter }: { onEnter: (password: string) => boolean }) {
   return (
     <main className="gate">
       <section className="sea">
-        <p className="serif" style={{ fontSize: "2.6rem", margin: 0 }}>Rain / Stanfield</p>
+        <img className="burst" src="/brand/starburst_web_faded.png" alt="" />
         <p className="kicker">Private file preview</p>
+        <img className="brand-lockup" src="/brand/swr_header_logo_white.png" alt="Stay with Rain, Ocean Springs, MS" />
       </section>
       <section className="panel">
         <form
@@ -139,9 +140,10 @@ function Login({ onSignIn }: { onSignIn: (email: string, password: string) => bo
   return (
     <main className="login">
       <section className="sea">
-        <p className="serif" style={{ fontSize: "3rem", margin: "2rem 0 0" }}>Rain / Stanfield</p>
-        <p className="kicker">Gulf Coast Mississippi</p>
-        <p style={{ maxWidth: "22rem", fontSize: "1.1rem" }}>Eight houses. Each owner sees only their own calendar.</p>
+        <img className="burst" src="/brand/starburst_web_faded.png" alt="" />
+        <p className="kicker">Owner portal</p>
+        <img className="brand-lockup" src="/brand/swr_header_logo_white.png" alt="Stay with Rain, Ocean Springs, MS" style={{ marginTop: "2rem" }} />
+        <p style={{ position: "relative", maxWidth: "22rem", fontSize: "1.05rem", marginTop: "1.5rem" }}>Your calendars, upcoming stays, and occupancy, for the houses assigned to you.</p>
       </section>
       <section className="panel">
         <form
@@ -209,8 +211,8 @@ function Shell({
       <header className="header">
         <div className="header-inner">
           <div>
-            <p className="serif" style={{ fontSize: "2rem", margin: 0 }}>Rain / Stanfield</p>
-            <p className="kicker">Owner portal · Gulf Coast Mississippi</p>
+            <img className="wordmark" src="/brand/swr_header_logo_white_wordmark.png" alt="Stay with Rain" />
+            <p className="kicker">Owner portal · Mississippi Gulf Coast</p>
           </div>
           <p style={{ textAlign: "right", fontSize: "0.85rem" }}>
             <span className="kicker">Last updated</span><br />
@@ -310,7 +312,7 @@ function Portal({
         />
       ) : null}
       <Stays stays={view.upcoming} today={view.today} />
-      <p className="footer">Guest names are a first name and last initial. Payments, contact details, and notes are not in this preview. Rain / Stanfield · Mississippi Gulf Coast</p>
+      <p className="footer">Guest names are a first name and last initial. Payments, contact details, and notes are not in this preview. Stay with Rain · Mississippi Gulf Coast</p>
     </>
   );
 }

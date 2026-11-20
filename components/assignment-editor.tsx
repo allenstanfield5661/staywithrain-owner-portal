@@ -108,12 +108,12 @@ export function AssignmentEditor({
             </li>
           ))}
         </ul>
-        <div className="sticky bottom-3 flex flex-wrap items-center gap-3 rounded-2xl bg-sea px-4 py-3 text-[#f6f3ec] shadow-lg">
-          <Button type="submit" disabled={pending} variant="secondary" className="bg-[#f6f3ec] text-sea hover:bg-white">
+        <div className="sticky bottom-3 flex flex-wrap items-center gap-3 rounded-2xl bg-sea px-4 py-3 text-white shadow-lg">
+          <Button type="submit" disabled={pending} variant="secondary" className="bg-white text-sea hover:bg-brass-soft">
             {pending ? "Saving…" : "Save assignments"}
           </Button>
           {state.error ? (
-            <p role="alert" className="text-sm text-[#f6d4cf]">
+            <p role="alert" className="text-sm text-brass-soft">
               {state.error}
             </p>
           ) : null}
