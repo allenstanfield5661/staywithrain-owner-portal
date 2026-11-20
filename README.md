@@ -1,4 +1,4 @@
-# Rain / Stanfield owner portal
+# Stay with Rain owner portal
 
 A private preview for short-term-rental owners on the Mississippi Gulf Coast. An owner signs in and sees only the houses assigned to them: a six-month booking calendar, upcoming stays, and occupancy for this month and next. Peaceful Pearl, Porter Vibe, and Porter Pulse #19 also show a golf-cart calendar.
 

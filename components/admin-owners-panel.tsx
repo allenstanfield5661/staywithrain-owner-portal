@@ -79,7 +79,7 @@ export function AdminOwnersPanel() {
             ) : null}
           </div>
         </dl>
-        {warning ? <p className="mt-3 text-sm text-brass">{warning}</p> : null}
+        {warning ? <p className="mt-3 text-sm text-foreground">{warning}</p> : null}
         {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading listings…</p> : null}
         {error && !payload?.owners ? (
           <Button type="button" className="mt-4 w-fit" onClick={() => void load()}>

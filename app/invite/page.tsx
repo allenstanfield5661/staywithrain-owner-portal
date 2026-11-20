@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { SetPasswordForm } from "@/components/set-password-form";
 
 export default function InvitePage({
@@ -18,7 +19,7 @@ async function Invite({ searchParams }: { searchParams: Promise<{ token?: string
   const token = Array.isArray(params.token) ? params.token[0] : params.token;
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">Rain / Stanfield</p>
+      <BrandMark variant="navy-wordmark" className="h-8 w-auto" />
       <h1 className="mt-2 font-heading text-4xl tracking-tight text-sea">Set your password</h1>
       <p className="mt-2 mb-6 text-sm text-muted-foreground">Choose a password for your owner login. This link expires in 7 days.</p>
       {token ? <SetPasswordForm token={token} /> : <p className="text-sm text-destructive">This invite link is missing a token.</p>}

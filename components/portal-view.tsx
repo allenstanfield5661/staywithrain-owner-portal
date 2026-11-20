@@ -48,7 +48,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
       <div className="rounded-2xl bg-card px-5 py-10 ring-1 ring-foreground/10">
         <h1 className="font-heading text-4xl tracking-tight text-sea">No units on this login</h1>
         <p className="mt-3 max-w-lg text-sm text-muted-foreground">
-          Rain / Stanfield has not assigned a house to this account yet. An admin can connect one from Manage owners.
+          Stay with Rain has not assigned a house to this account yet. An admin can connect one from Manage owners.
         </p>
       </div>
     );
@@ -67,7 +67,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "shrink-0 rounded-full px-3 py-1.5 text-sm",
-                  active ? "bg-sea text-[#f6f3ec]" : "bg-card ring-1 ring-border hover:bg-muted",
+                  active ? "bg-sea text-white" : "bg-card ring-1 ring-border hover:bg-muted",
                 )}
               >
                 {unit.name}
@@ -96,7 +96,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
           <p className="mt-4 text-sm text-muted-foreground">No one is in the house today.</p>
         )}
         {selected.hostawayLinked === false ? (
-          <p className="mt-3 text-sm text-brass">
+          <p className="mt-3 text-sm text-foreground">
             {view.account.role === "admin"
               ? "No Hostaway listing matched this name. Set hostawayListingId in config/units.json if the title differs."
               : "Reservations for this house are not linked yet."}
@@ -164,7 +164,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
         </p>
       ) : null}
       {view.account.role === "admin" && view.warning ? (
-        <p className="text-sm text-brass">{view.warning}</p>
+        <p className="text-sm text-foreground">{view.warning}</p>
       ) : null}
       {view.account.role === "admin" && view.unmatchedCarts > 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -175,7 +175,7 @@ export function PortalViewBody({ view }: { view: PortalView }) {
       <footer className="border-t border-border pt-6 text-sm text-muted-foreground">
         Guest names are shortened to a first name and last initial. Payments, payouts, card details, contact
         information, and internal notes are never shown.
-        <span className="mt-1 block">Rain / Stanfield · Mississippi Gulf Coast</span>
+        <span className="mt-1 block">Stay with Rain · Mississippi Gulf Coast</span>
       </footer>
     </div>
   );

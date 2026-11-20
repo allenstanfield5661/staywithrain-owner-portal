@@ -3,8 +3,8 @@ import type { PublicStay } from "@/lib/stays";
 import { cn } from "@/lib/utils";
 
 function pillClass(stay: PublicStay): string {
-  if (stay.tone === "owner") return "bg-[#ead7b0] text-[#3f3014]";
-  if (stay.tone === "pending") return "bg-[#fbf6ea] text-[#3f3014] ring-1 ring-brass/40";
+  if (stay.tone === "owner") return "bg-brass-soft text-foreground";
+  if (stay.tone === "pending") return "bg-brass-soft/70 text-foreground ring-1 ring-brass/50";
   if (stay.statusLabel === "Updated") return "bg-foam text-sea";
   return "bg-secondary text-secondary-foreground";
 }

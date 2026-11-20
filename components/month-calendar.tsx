@@ -5,16 +5,16 @@ import { addDays, dayNumber, formatMonth, formatStayDate, formatWeekday, monthGr
 import { cn } from "@/lib/utils";
 
 const toneClass: Record<CalendarTone, string> = {
-  guest: "bg-sea text-[#f6f3ec]",
-  owner: "bg-[#ead7b0] text-[#3f3014]",
-  pending: "border border-dashed border-brass bg-[#fbf6ea] text-[#3f3014]",
-  cart: "bg-cart text-[#f3faf6]",
+  guest: "bg-sea text-white",
+  owner: "bg-brass-soft text-foreground",
+  pending: "border border-dashed border-brass bg-brass-soft/70 text-foreground",
+  cart: "bg-cart text-white",
 };
 
 const swatchClass: Record<CalendarTone, string> = {
   guest: "bg-sea",
-  owner: "bg-[#ead7b0] ring-1 ring-[#d7c39a]",
-  pending: "border border-dashed border-brass bg-[#fbf6ea]",
+  owner: "bg-brass-soft ring-1 ring-brass/50",
+  pending: "border border-dashed border-brass bg-brass-soft/70",
   cart: "bg-cart",
 };
 
@@ -92,7 +92,7 @@ export function MonthCalendar({
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "shrink-0 rounded-full px-3 py-1.5 text-sm",
-                  active ? "bg-sea text-[#f6f3ec]" : "bg-background text-foreground ring-1 ring-border hover:bg-muted",
+                  active ? "bg-sea text-white" : "bg-background text-foreground ring-1 ring-border hover:bg-muted",
                 )}
               >
                 {link.label}
@@ -128,7 +128,7 @@ export function MonthCalendar({
                       <span
                         className={cn(
                           "inline-flex size-6 items-center justify-center rounded-full text-xs",
-                          isToday && "bg-sea text-[#f6f3ec]",
+                          isToday && "bg-sea text-white",
                           !isToday && day.inMonth && "text-foreground",
                           !day.inMonth && "text-muted-foreground/45",
                         )}

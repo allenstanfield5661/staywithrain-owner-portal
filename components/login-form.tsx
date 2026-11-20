@@ -53,9 +53,9 @@ export function LoginForm({ previews }: { previews: PreviewLogin[] }) {
         </Button>
       </form>
 
-      {previews.length > 0 ? <div className="rounded-xl bg-brass-soft/70 p-4 ring-1 ring-brass/15">
-        <p className="text-sm font-medium text-[#3f3014]">Preview sign-in</p>
-        <p className="mt-1 text-sm text-[#5c4a30]">
+      {previews.length > 0 ? <div className="rounded-xl bg-brass-soft/70 p-4 ring-1 ring-brass/30">
+        <p className="text-sm font-medium text-foreground">Preview sign-in</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           These are fictional accounts so the preview runs without secrets. They are not real owners.
         </p>
         <ul className="mt-3 flex flex-col gap-2">

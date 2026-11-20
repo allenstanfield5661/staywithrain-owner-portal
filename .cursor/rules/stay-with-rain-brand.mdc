@@ -1,0 +1,38 @@
+---
+description: Stay with Rain brand guidelines, visual tokens, logo assets, and copy rules for UI and marketing surfaces
+alwaysApply: true
+---
+
+# Stay with Rain Brand Standards
+
+When designing, updating, or writing copy for any user-facing surface in this repo, follow the official Stay with Rain brand system (full guide in `docs/stay-with-rain-brand-guide.md`, assets in `public/brand/`):
+
+## Palette
+- **Primary Navy:** `#12384F` (primary brand anchor, dark headers/hero, primary CTA buttons)
+- **Charcoal:** `#2B2A28` (primary body text)
+- **Porch Peach:** `#F4D9BE` (signature warm accent, soft surfaces, highlights, badges)
+- **Sand / Gold:** `#D4A975` (accent rules `#D9AB76`, warm detail)
+- **Gulf Teal:** `#A9D6D3` (soft coastal accent)
+- **Seafoam:** `#7AABB0` (secondary coastal accent, charts/status)
+- **Rust:** `#B85C22` (warm terracotta accent, use sparingly)
+- **Olive:** `#4D4E13` (earthy accent, use sparingly)
+- **Mist:** `#E8E8E8` (borders, dividers)
+- **Warm Canvas:** `#FAF7F3` / `#FFFFFF`
+
+## Typography (Google Fonts)
+- Headings: `League Spartan` (600–700)
+- Body & UI: `Montserrat` (400–600)
+- Wordmark display: `Aboreto`
+- Script accent (sparingly): `Allura`
+
+## Logos (`public/brand/`)
+- Light backgrounds: `swr_header_logo_navy.png` (full lockup) or `swr_header_logo_navy_wordmark.png` (compact nav), `swr_logo_transparent.png` (stacked emblem)
+- Dark Navy (`#12384F`) backgrounds: `swr_header_logo_white.png` (full lockup) or `swr_header_logo_white_wordmark.png` (compact nav)
+- Decorative subtle watermark: `starburst_web_faded.png`
+
+## Copy & Compliance Rules
+- Always brand as **Stay with Rain** (Ocean Springs / Mississippi Gulf Coast). Never hard-code a fixed house count like "eight houses".
+- Voice: warm, local, polished, and helpful.
+- If displaying phone `228-875-4496`, ALWAYS label it **Call** only — never "text" or "Call or text".
+- No hashtags in UI copy.
+- Official booking site: `https://staywithrain.thebookingportal.com/`.

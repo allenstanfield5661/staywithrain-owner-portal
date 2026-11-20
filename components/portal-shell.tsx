@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { PublicAccount } from "@/lib/catalog";
 import { formatTimestamp } from "@/lib/dates";
@@ -24,12 +25,12 @@ export function PortalShell({
       >
         Skip to content
       </a>
-      <header className="bg-sea text-[#f6f3ec]">
+      <header className="bg-sea text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-5 sm:px-6">
           <div>
-            <p className="font-heading text-[1.7rem] leading-none tracking-tight sm:text-4xl">Rain / Stanfield</p>
+            <BrandMark variant="white-wordmark" className="h-8 w-auto sm:h-10" />
             <p className="mt-2 text-[11px] tracking-[0.16em] text-white/75 uppercase">
-              Owner portal · Gulf Coast Mississippi
+              Owner portal · Mississippi Gulf Coast
             </p>
           </div>
           <p className="text-right text-xs leading-5 text-white/80 sm:text-sm">
@@ -40,7 +41,7 @@ export function PortalShell({
       </header>
       <div className="h-1 bg-brass" />
       {source === "mock" ? (
-        <div className="bg-brass-soft text-[#3f3014]">
+        <div className="bg-brass-soft text-foreground">
           <p className="mx-auto max-w-6xl px-4 py-2 text-sm sm:px-6">
             Sample calendar for this preview. Guest names are fictional.
           </p>
