@@ -1,9 +1,17 @@
 import { normalizeName, type Unit } from "@/lib/catalog";
 import { addDays } from "@/lib/dates";
 import { toPublicStay, type PublicStay, type RawStay } from "@/lib/stays";
-import { CACHE_TTL_MS, clearTimedCache, remember } from "@/lib/timed-cache";
+import {
+  CACHE_TTL_MS,
+  clearTimedCache,
+  invalidateTimedCache,
+  peekEntry,
+  remember,
+  writeTimedCache,
+} from "@/lib/timed-cache";
 
 const API_BASE = "https://api.hostaway.com/v1";
+const TOKEN_KEY = "hostaway-token";
 const PAGE_SIZE = 500;
 const PAGE_CONCURRENCY = 4;
 const REQUEST_TIMEOUT_MS = 8000;
@@ -107,7 +115,6 @@ async function fetchJson(url: string, token: string, deadline: number): Promise<
         signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, budget)),
       });
       if (response.status === 401 || response.status === 403) {
-        clearTimedCache();
         throw new HostawayAuthError(
           "Hostaway refused the access token. Check HOSTAWAY_ACCOUNT_ID and HOSTAWAY_API_KEY.",
         );
@@ -202,8 +209,24 @@ async function requestHostawayToken(deadline: number): Promise<string> {
   throw lastError ?? new Error("Hostaway could not issue an access token.");
 }
 
+async function loadHostawayToken(deadline: number, options?: { force?: boolean }): Promise<string> {
+  if (options?.force) await invalidateTimedCache(TOKEN_KEY);
+  const entry = options?.force ? null : await peekEntry<string>(TOKEN_KEY);
+  if (entry && !entry.stale) return entry.value;
+  try {
+    const token = await requestHostawayToken(deadline);
+    await writeTimedCache(TOKEN_KEY, CACHE_TTL_MS, token);
+    return token;
+  } catch (error) {
+    // The previous token is still usable when the token endpoint cannot be reached.
+    // A forced refresh has already deleted a rejected token, so it cannot fall back.
+    if (entry) return entry.value;
+    throw error;
+  }
+}
+
 export async function getHostawayToken(): Promise<string> {
-  return remember("hostaway-token", CACHE_TTL_MS, () => requestHostawayToken(Date.now() + REQUEST_TIMEOUT_MS * 2));
+  return loadHostawayToken(Date.now() + REQUEST_TIMEOUT_MS * 2);
 }
 
 function listUrl(path: string, params: Record<string, string>, offset: number, limit = PAGE_SIZE): string {
@@ -253,7 +276,8 @@ async function fetchPages(
         const page = await fetchPage(path, token, params, offset, deadline);
         byOffset.set(offset, page.items);
         counts.set(offset, page.count);
-      } catch {
+      } catch (error) {
+        if (error instanceof HostawayAuthError) throw error;
         failed.add(offset);
       }
     }
@@ -317,7 +341,8 @@ async function fetchPaged(
         byOffset.set(offset, nextPage.items);
         if (nextPage.items.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
-      } catch {
+      } catch (error) {
+        if (error instanceof HostawayAuthError) throw error;
         failed.add(offset);
         break;
       }
@@ -380,10 +405,13 @@ function mapStays(
   return stays;
 }
 
-async function fetchLiveCalendar(windowStart: string, windowEnd: string): Promise<LiveCalendar> {
-  const started = Date.now();
-  const deadline = started + CALENDAR_BUDGET_MS;
-  const token = await remember("hostaway-token", CACHE_TTL_MS, () => requestHostawayToken(deadline));
+async function fetchLiveCalendarWithToken(
+  windowStart: string,
+  windowEnd: string,
+  token: string,
+  started: number,
+  deadline: number,
+): Promise<LiveCalendar> {
   const arrivalStart = addDays(windowStart, -120);
   const reservationParams = {
     arrivalStartDate: arrivalStart,
@@ -428,11 +456,24 @@ async function fetchLiveCalendar(windowStart: string, windowEnd: string): Promis
   return { stays, units, warning };
 }
 
+async function fetchLiveCalendar(windowStart: string, windowEnd: string): Promise<LiveCalendar> {
+  const started = Date.now();
+  const deadline = started + CALENDAR_BUDGET_MS;
+  const token = await loadHostawayToken(deadline);
+  try {
+    return await fetchLiveCalendarWithToken(windowStart, windowEnd, token, started, deadline);
+  } catch (error) {
+    if (!(error instanceof HostawayAuthError)) throw error;
+    const refreshed = await loadHostawayToken(deadline, { force: true });
+    return await fetchLiveCalendarWithToken(windowStart, windowEnd, refreshed, started, deadline);
+  }
+}
+
 export async function loadLiveCalendar(windowStart: string, windowEnd: string): Promise<LiveCalendar> {
   return remember(
     `hostaway-calendar:${windowStart}:${windowEnd}`,
     CACHE_TTL_MS,
     () => fetchLiveCalendar(windowStart, windowEnd),
-    { shouldPersist: (value) => !value.warning },
+    { shouldPersist: (value) => !value.warning, allowStale: false },
   );
 }

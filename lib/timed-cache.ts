@@ -37,6 +37,17 @@ async function writeBlob(key: string, value: string): Promise<void> {
   }
 }
 
+async function deleteBlob(key: string): Promise<void> {
+  if (process.env.NETLIFY !== "true" && !process.env.NETLIFY_BLOBS_CONTEXT) return;
+  try {
+    const { getStore } = await import("@netlify/blobs");
+    const store = getStore("owner-portal");
+    await withTimeout(store.delete(key), BLOB_TIMEOUT_MS, "Blob delete timed out");
+  } catch {
+    // The in-memory copy is already cleared.
+  }
+}
+
 export async function peekEntry<T>(key: string): Promise<CacheEntry<T> | null> {
   const now = Date.now();
   const cached = memory.get(key);
@@ -68,6 +79,11 @@ export async function writeTimedCache<T>(key: string, ttlMs: number, value: T): 
   await writeBlob(key, JSON.stringify(entry));
 }
 
+export async function invalidateTimedCache(key: string): Promise<void> {
+  memory.delete(key);
+  await deleteBlob(key);
+}
+
 export async function remember<T>(
   key: string,
   ttlMs: number,
@@ -75,7 +91,8 @@ export async function remember<T>(
   options?: { shouldPersist?: (value: T) => boolean; allowStale?: boolean },
 ): Promise<T> {
   const entry = await peekEntry<T>(key);
-  if (entry && (options?.allowStale !== false ? true : !entry.stale)) return entry.value;
+  // Expired entries are refetched. Pass allowStale to keep serving one without a refresh.
+  if (entry && (options?.allowStale === true || !entry.stale)) return entry.value;
   const value = await load();
   if (options?.shouldPersist && !options.shouldPersist(value)) return value;
   await writeTimedCache(key, ttlMs, value);
