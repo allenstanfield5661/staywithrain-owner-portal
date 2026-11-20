@@ -64,7 +64,9 @@ export function AdminOwnersPanel() {
         <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">Admin</p>
         <h1 className="mt-1 font-heading text-4xl tracking-tight text-sea sm:text-5xl">Owners and units</h1>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Each house belongs to one owner. That owner sees only their units. You can open every calendar.
+          One email is one login. When two names are on a house but only one email is on file, keep both names on that
+          single account. Add another login only for a co-owner with a different email. A listing can be on every login
+          that should see it, and each person sees only the houses on their account. You can open every calendar.
         </p>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div className="rounded-xl bg-card px-4 py-3 ring-1 ring-foreground/10">

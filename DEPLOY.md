@@ -63,7 +63,7 @@ Paste the printed hash into `ADMIN_PASSWORD_HASH`. Do not put the password itsel
 
 1. Sign in at the site with `ADMIN_EMAIL` and the password you hashed.
 2. Open **Manage owners**.
-3. Add each owner’s name, email, and Hostaway listing ids. Save.
+3. Add each owner’s name, email, and Hostaway listing ids. Save. One email is one login: if two names share a mailbox, keep them on one account. Add a second login only when a co-owner has a different email. The same listing id can be checked on more than one of those logins.
 4. Choose **Create invite link** and send that URL to the owner.
 5. The owner opens the link, sets a password, and then signs in with their email.
 

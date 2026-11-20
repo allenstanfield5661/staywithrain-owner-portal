@@ -5,7 +5,7 @@ import { PortalViewBody } from "@/components/portal-view";
 import { Button } from "@/components/ui/button";
 import { listUnits, type PublicAccount } from "@/lib/catalog";
 import type { Snapshot } from "@/lib/snapshot";
-import { buildPortalView, type PortalView } from "@/lib/view";
+import { buildPortalView, type AssignmentMap, type PortalView } from "@/lib/view";
 
 type CalendarResponse = {
   ok: boolean;
@@ -14,13 +14,13 @@ type CalendarResponse = {
   error?: string;
   view?: PortalView;
   snapshot?: Snapshot;
-  assignments?: Record<string, string | null>;
+  assignments?: AssignmentMap;
   account?: PublicAccount;
 };
 
 type LocalCache = {
   snapshot: Snapshot;
-  assignments: Record<string, string | null>;
+  assignments: AssignmentMap;
 };
 
 const STORAGE_KEY = "swr-calendar-cache";

@@ -9,7 +9,7 @@ import { getAccount } from "@/lib/auth";
 import { listUnits } from "@/lib/catalog";
 import { dataMode } from "@/lib/data-mode";
 import { createInviteToken, inviteUrl, readInviteToken } from "@/lib/invites";
-import { loadOwners, saveOwners, type StoredOwner } from "@/lib/owner-store";
+import { loadOwners, mergeOwnerDrafts, saveOwners } from "@/lib/owner-store";
 import { hashPassword } from "@/lib/passwords";
 import { allowAttempt } from "@/lib/rate-limit";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
@@ -95,23 +95,8 @@ export async function saveOwnersAction(_prev: ActionState, formData: FormData): 
   } catch {
     return { error: "The owner list could not be read." };
   }
-  const existing = await loadOwners();
-  const next: StoredOwner[] = [];
-  for (const entry of incoming) {
-    const email = entry.email?.trim().toLowerCase() ?? "";
-    const name = entry.name?.trim() ?? "";
-    if (!email || !name || !email.includes("@")) return { error: "Each owner needs a name and email." };
-    const id = entry.id?.trim() || `owner-${email.replace(/[^a-z0-9]+/g, "-")}`;
-    const prior = existing.find((owner) => owner.id === id || owner.email === email);
-    next.push({
-      id: prior?.id ?? id,
-      name,
-      email,
-      passwordHash: prior?.passwordHash ?? null,
-      listingIds: Array.isArray(entry.listingIds) ? entry.listingIds.map(String) : [],
-    });
-  }
   try {
+    const next = mergeOwnerDrafts(await loadOwners(), incoming);
     await saveOwners(next);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Those owners could not be saved." };
