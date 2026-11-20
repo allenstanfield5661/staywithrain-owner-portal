@@ -53,9 +53,20 @@ export function portalHref(unitId: string, month: string): string {
   return `/portal?unit=${encodeURIComponent(unitId)}&month=${encodeURIComponent(month)}`;
 }
 
-export function unitsVisibleTo(account: PublicAccount, units: Unit[], assignments: Record<string, string | null>): Unit[] {
+/** A single owner id, or every owner id allowed to open that listing. */
+export type ListingAssignment = string | readonly string[] | null;
+
+export type AssignmentMap = Record<string, ListingAssignment>;
+
+export function listingOwnerIds(assigned: ListingAssignment | undefined): string[] {
+  if (typeof assigned === "string") return assigned ? [assigned] : [];
+  if (Array.isArray(assigned)) return assigned.filter((id) => id.length > 0);
+  return [];
+}
+
+export function unitsVisibleTo(account: PublicAccount, units: Unit[], assignments: AssignmentMap): Unit[] {
   if (account.role === "admin") return units;
-  return units.filter((unit) => assignments[unit.id] === account.id);
+  return units.filter((unit) => listingOwnerIds(assignments[unit.id]).includes(account.id));
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -85,7 +96,7 @@ function toUnitView(unit: Unit, snapshot: Snapshot): UnitView {
 export function buildPortalView(input: {
   account: PublicAccount;
   units: Unit[];
-  assignments: Record<string, string | null>;
+  assignments: AssignmentMap;
   snapshot: Snapshot;
   unit?: string | string[];
   month?: string | string[];

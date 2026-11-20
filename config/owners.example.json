@@ -5,6 +5,12 @@
       "name": "Placeholder Owner",
       "email": "owner@example.com",
       "listingIds": ["REPLACE_WITH_HOSTAWAY_LISTING_ID"]
+    },
+    {
+      "id": "owner-co-owner",
+      "name": "Placeholder Co-owner",
+      "email": "co-owner@example.com",
+      "listingIds": ["REPLACE_WITH_HOSTAWAY_LISTING_ID"]
     }
   ]
 }

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dataMode } from "@/lib/data-mode";
+import { duplicateOwnerEmailMessage, normalizeOwnerEmail } from "@/lib/owner-rules";
 import { BLOB_TIMEOUT_MS, withTimeout } from "@/lib/timeout";
 
 export type StoredOwner = {
@@ -17,6 +18,13 @@ export type PublicOwner = {
   email: string;
   listingIds: string[];
   hasPassword: boolean;
+};
+
+export type OwnerDraft = {
+  id?: string;
+  name?: string;
+  email?: string;
+  listingIds?: string[];
 };
 
 const localPath = path.join(process.cwd(), "data", "owners.live.json");
@@ -38,6 +46,78 @@ function cloneOwner(owner: StoredOwner): StoredOwner {
   return { ...owner, listingIds: [...owner.listingIds] };
 }
 
+function cleanListingIds(listingIds: unknown): string[] {
+  if (!Array.isArray(listingIds)) return [];
+  const ids = listingIds.map((id) => String(id).trim()).filter(Boolean);
+  return [...new Set(ids)];
+}
+
+export function normalizeStoredOwner(owner: StoredOwner): StoredOwner {
+  return {
+    id: owner.id.trim(),
+    name: owner.name.trim(),
+    email: normalizeOwnerEmail(owner.email),
+    passwordHash: owner.passwordHash ?? null,
+    listingIds: cleanListingIds(owner.listingIds),
+  };
+}
+
+function assertUniqueOwnerLogins(owners: StoredOwner[]): void {
+  const emails = new Set<string>();
+  const ids = new Set<string>();
+  for (const owner of owners) {
+    if (!owner.id) throw new Error("Each owner needs an id.");
+    if (!owner.name || !owner.email || !owner.email.includes("@")) {
+      throw new Error("Each owner needs a name and email.");
+    }
+    if (ids.has(owner.id)) throw new Error("Each owner needs a unique id.");
+    if (emails.has(owner.email)) throw new Error(duplicateOwnerEmailMessage(owner.email));
+    ids.add(owner.id);
+    emails.add(owner.email);
+  }
+}
+
+export function mergeOwnerDrafts(existing: StoredOwner[], incoming: OwnerDraft[]): StoredOwner[] {
+  const drafts = incoming.map((entry) => {
+    const email = normalizeOwnerEmail(entry.email ?? "");
+    const name = entry.name?.trim() ?? "";
+    if (!name || !email || !email.includes("@")) {
+      throw new Error("Each owner needs a name and email.");
+    }
+    return {
+      id: entry.id?.trim() || `owner-${email.replace(/[^a-z0-9]+/g, "-")}`,
+      name,
+      email,
+      listingIds: cleanListingIds(entry.listingIds),
+    };
+  });
+
+  const seenEmails = new Set<string>();
+  const seenIds = new Set<string>();
+  for (const draft of drafts) {
+    if (seenIds.has(draft.id)) throw new Error("Each owner needs a unique id.");
+    if (seenEmails.has(draft.email)) throw new Error(duplicateOwnerEmailMessage(draft.email));
+    seenIds.add(draft.id);
+    seenEmails.add(draft.email);
+  }
+
+  const incomingIds = new Set(drafts.map((draft) => draft.id));
+  return drafts.map((draft) => {
+    const priorById = existing.find((owner) => owner.id === draft.id);
+    const priorByEmail = existing.find((owner) => normalizeOwnerEmail(owner.email) === draft.email);
+    const emailKeptOnAnotherLogin =
+      priorByEmail !== undefined && priorByEmail.id !== draft.id && incomingIds.has(priorByEmail.id);
+    const prior = priorById ?? (emailKeptOnAnotherLogin ? undefined : priorByEmail);
+    return {
+      id: prior?.id ?? draft.id,
+      name: draft.name,
+      email: draft.email,
+      passwordHash: prior?.passwordHash ?? null,
+      listingIds: draft.listingIds,
+    };
+  });
+}
+
 export function parseOwnersConfig(raw: string): StoredOwner[] {
   const parsed = JSON.parse(raw) as { owners?: unknown };
   if (!parsed || !Array.isArray(parsed.owners)) {
@@ -51,7 +131,7 @@ export function parseOwnersConfig(raw: string): StoredOwner[] {
     return {
       id: owner.id,
       name: owner.name,
-      email: owner.email.trim().toLowerCase(),
+      email: normalizeOwnerEmail(owner.email),
       passwordHash: owner.passwordHash ?? null,
       listingIds: Array.isArray(owner.listingIds) ? owner.listingIds.map(String) : [],
     };
@@ -109,19 +189,8 @@ export async function loadOwners(): Promise<StoredOwner[]> {
 }
 
 export async function saveOwners(owners: StoredOwner[]): Promise<void> {
-  const normalized = owners.map((owner) => ({
-    ...cloneOwner(owner),
-    email: owner.email.trim().toLowerCase(),
-    listingIds: [...new Set(owner.listingIds.map(String))],
-  }));
-  const seenListings = new Set<string>();
-  for (let index = normalized.length - 1; index >= 0; index -= 1) {
-    normalized[index].listingIds = normalized[index].listingIds.filter((id) => {
-      if (seenListings.has(id)) return false;
-      seenListings.add(id);
-      return true;
-    });
-  }
+  const normalized = owners.map((owner) => normalizeStoredOwner(owner));
+  assertUniqueOwnerLogins(normalized);
   if (testMode) {
     testOwners = normalized;
     return;
@@ -138,10 +207,18 @@ export async function saveOwners(owners: StoredOwner[]): Promise<void> {
   }
 }
 
-export async function liveAssignmentMap(): Promise<Record<string, string | null>> {
-  const map: Record<string, string | null> = {};
+export async function liveAssignmentMap(): Promise<Record<string, string | string[]>> {
+  const grouped = new Map<string, string[]>();
   for (const owner of await loadOwners()) {
-    for (const listingId of owner.listingIds) map[listingId] = owner.id;
+    for (const listingId of owner.listingIds) {
+      const ownerIds = grouped.get(listingId) ?? [];
+      if (!ownerIds.includes(owner.id)) ownerIds.push(owner.id);
+      grouped.set(listingId, ownerIds);
+    }
+  }
+  const map: Record<string, string | string[]> = {};
+  for (const [listingId, ownerIds] of grouped) {
+    map[listingId] = ownerIds.length === 1 ? ownerIds[0] : ownerIds;
   }
   return map;
 }
