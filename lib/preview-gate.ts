@@ -44,6 +44,11 @@ export async function previewCookieMatches(token: string | undefined, password: 
   return difference === 0;
 }
 
+/** Public marketing preview. Never treat a lookalike path such as /demonstration as public. */
+export function isPublicDemoPath(pathname: string): boolean {
+  return pathname === "/demo" || pathname.startsWith("/demo/");
+}
+
 export function previewDecision(input: {
   nodeEnv: string | undefined;
   password: string | undefined;
@@ -52,7 +57,10 @@ export function previewDecision(input: {
   dataMode?: "mock" | "live";
 }): PreviewDecision {
   if (input.dataMode === "live") return "allow";
-  const openPath = input.pathname === "/preview-gate" || input.pathname === "/api/preview-gate";
+  const openPath =
+    input.pathname === "/preview-gate" ||
+    input.pathname === "/api/preview-gate" ||
+    isPublicDemoPath(input.pathname);
   if (!input.password) {
     if (input.nodeEnv === "production") return openPath ? "allow" : "locked";
     return "allow";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { previewCookieMatches, previewDecision, previewToken } from "@/lib/preview-gate";
+import { isPublicDemoPath, previewCookieMatches, previewDecision, previewToken } from "@/lib/preview-gate";
 
 describe("preview gate", () => {
   it("stays open in local development until a password is set", () => {
@@ -40,6 +40,26 @@ describe("preview gate", () => {
     expect(previewDecision({ nodeEnv: "production", password: "secret", pathname: "/portal", cookieOk: true })).toBe(
       "allow",
     );
+  });
+
+  it("lets the public sample portal through without a preview cookie", () => {
+    for (const pathname of ["/demo", "/demo/calendar", "/demo/reservations", "/demo/statements", "/demo/golf-cart"]) {
+      expect(isPublicDemoPath(pathname)).toBe(true);
+      expect(previewDecision({ nodeEnv: "production", password: "secret", pathname, cookieOk: false })).toBe("allow");
+      expect(previewDecision({ nodeEnv: "production", password: undefined, pathname, cookieOk: false })).toBe("allow");
+      expect(
+        previewDecision({ nodeEnv: "production", dataMode: "live", password: undefined, pathname, cookieOk: false }),
+      ).toBe("allow");
+    }
+    expect(isPublicDemoPath("/demonstration")).toBe(false);
+    expect(isPublicDemoPath("/demo-extra")).toBe(false);
+  });
+
+  it("still gates the owner portal, admin, and dashboard when a preview password is set", () => {
+    for (const pathname of ["/dashboard", "/admin", "/admin/owners", "/portal", "/api/calendar", "/api/admin"]) {
+      expect(previewDecision({ nodeEnv: "production", password: "secret", pathname, cookieOk: false })).toBe("gate");
+      expect(isPublicDemoPath(pathname)).toBe(false);
+    }
   });
 
   it("accepts only the token for the configured password", async () => {
