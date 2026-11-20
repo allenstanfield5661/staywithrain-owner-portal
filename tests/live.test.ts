@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { authenticate } from "@/lib/authenticate";
 import { buildPortalView } from "@/lib/view";
-import { clearTimedCache, setTimedCacheForTests } from "@/lib/timed-cache";
+import { clearTimedCache, remember, setTimedCacheForTests } from "@/lib/timed-cache";
 import { readCachedSnapshot, snapshotCacheKey, warmSnapshot } from "@/lib/snapshot";
 import { withTimeout } from "@/lib/timeout";
 import { loadLiveCalendar, setHostawayFetchForTests } from "@/lib/hostaway";
@@ -310,6 +310,259 @@ describe("Hostaway mapping", () => {
     expect(second.warning).toBeUndefined();
   });
 
+  it("refetches listings and reservations after the calendar cache expires", async () => {
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let generation = 0;
+    const calls: string[] = [];
+    setHostawayFetchForTests(async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/accessTokens")) return Response.json({ access_token: "token-1" });
+      if (url.includes("/listings")) {
+        const result = [
+          { id: 484247, name: "Porter House", city: "Ocean Springs", bedroomsNumber: 3 },
+        ];
+        if (generation > 0) {
+          result.push({ id: 634553, name: "450 Porter Ave B", city: "Ocean Springs", bedroomsNumber: 2 });
+        }
+        return Response.json({ result, count: result.length });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        const result: Array<Record<string, unknown>> = [
+          {
+            id: 1,
+            listingMapId: 484247,
+            guestFirstName: "Camille",
+            guestLastName: "Duval",
+            arrivalDate: "2026-11-03",
+            departureDate: "2026-11-08",
+            status: generation === 0 ? "new" : "cancelled",
+            channelName: "airbnb",
+          },
+        ];
+        if (generation > 0) {
+          result.push({
+            id: 72011656,
+            listingMapId: 484247,
+            guestFirstName: "Dana",
+            guestLastName: "Anderson",
+            guestEmail: "dana@example.com",
+            arrivalDate: "2026-11-20",
+            departureDate: "2026-11-23",
+            status: "new",
+            channelName: "airbnb",
+          });
+        }
+        return Response.json({ result, count: result.length });
+      }
+      throw new Error(url);
+    });
+
+    const first = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(first.units.map((unit) => unit.id)).toEqual(["484247"]);
+    expect(first.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    const callsAfterFirst = calls.length;
+    const cached = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(cached).toEqual(first);
+    expect(calls).toHaveLength(callsAfterFirst);
+
+    generation = 1;
+    setTimedCacheForTests("hostaway-calendar:2026-11-01:2027-05-01", first, Date.now() - 1000);
+    const refreshed = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(refreshed.units.map((unit) => unit.id)).toEqual(["484247", "634553"]);
+    expect(refreshed.stays.map((stay) => stay.id)).toEqual(["hostaway-72011656"]);
+    expect(refreshed.stays.map((stay) => stay.guest)).toEqual(["Dana A."]);
+    expect(calls.length).toBeGreaterThan(callsAfterFirst);
+    const serialized = JSON.stringify(refreshed);
+    for (const secret of ["Anderson", "dana@example.com", "Duval", "Camille"]) {
+      expect(serialized).not.toContain(secret);
+    }
+  });
+
+  it("requests a new Hostaway token when the cached token has expired", async () => {
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let tokenWrites = 0;
+    const authorizations: string[] = [];
+    setHostawayFetchForTests(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/accessTokens")) {
+        tokenWrites += 1;
+        return Response.json({ access_token: `token-${tokenWrites}` });
+      }
+      authorizations.push(new Headers(init?.headers).get("authorization") ?? "");
+      if (url.includes("/listings")) {
+        return Response.json({
+          result: [{ id: 11, name: "Peaceful Pearl", city: "Ocean Springs", bedroomsNumber: 4 }],
+          count: 1,
+        });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        return Response.json({
+          result: [
+            {
+              id: 1,
+              listingMapId: 11,
+              guestFirstName: "Camille",
+              guestLastName: "Duval",
+              arrivalDate: "2026-11-03",
+              departureDate: "2026-11-08",
+              status: "new",
+              channelName: "airbnb",
+            },
+          ],
+          count: 1,
+        });
+      }
+      throw new Error(url);
+    });
+
+    await loadLiveCalendar("2026-11-01", "2027-05-01");
+    setTimedCacheForTests("hostaway-token", "token-1", Date.now() - 1000);
+    setTimedCacheForTests(
+      "hostaway-calendar:2026-11-01:2027-05-01",
+      { stays: [], units: [{ id: "11", name: "Peaceful Pearl", town: "Ocean Springs", bedrooms: 4 }] },
+      Date.now() - 1000,
+    );
+    const refreshed = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(refreshed.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    expect(tokenWrites).toBe(2);
+    expect(authorizations).toContain("Bearer token-2");
+  });
+
+  it("uses the previous token when a refresh cannot reach Hostaway", async () => {
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let tokenRequests = 0;
+    const authorizations: string[] = [];
+    setHostawayFetchForTests(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/accessTokens")) {
+        tokenRequests += 1;
+        if (tokenRequests > 1) return new Response("unavailable", { status: 500, headers: { "retry-after": "0" } });
+        return Response.json({ access_token: "token-1" });
+      }
+      authorizations.push(new Headers(init?.headers).get("authorization") ?? "");
+      if (url.includes("/listings")) {
+        return Response.json({
+          result: [{ id: 11, name: "Peaceful Pearl", city: "Ocean Springs", bedroomsNumber: 4 }],
+          count: 1,
+        });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        return Response.json({
+          result: [
+            {
+              id: 9,
+              listingMapId: 11,
+              guestFirstName: "Dana",
+              guestLastName: "Anderson",
+              arrivalDate: "2026-11-20",
+              departureDate: "2026-11-23",
+              status: "new",
+              channelName: "airbnb",
+            },
+          ],
+          count: 1,
+        });
+      }
+      throw new Error(url);
+    });
+
+    await loadLiveCalendar("2026-11-01", "2027-05-01");
+    setTimedCacheForTests("hostaway-token", "token-1", Date.now() - 1000);
+    setTimedCacheForTests("hostaway-calendar:2026-11-01:2027-05-01", { stays: [], units: [] }, Date.now() - 1000);
+    const refreshed = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(refreshed.stays.map((stay) => stay.guest)).toEqual(["Dana A."]);
+    expect(authorizations.every((header) => header === "Bearer token-1")).toBe(true);
+    expect(JSON.stringify(refreshed)).not.toContain("Anderson");
+  });
+
+  it("replaces a rejected Hostaway token and retries the calendar fetch once", async () => {
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let tokenWrites = 0;
+    let listingCalls = 0;
+    const authorizations: string[] = [];
+    setHostawayFetchForTests(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/accessTokens")) {
+        tokenWrites += 1;
+        return Response.json({ access_token: `token-${tokenWrites}` });
+      }
+      const authorization = new Headers(init?.headers).get("authorization") ?? "";
+      authorizations.push(authorization);
+      if (url.includes("/listings")) {
+        listingCalls += 1;
+        if (authorization === "Bearer token-1") return new Response("denied", { status: 401 });
+        return Response.json({
+          result: [{ id: 634553, name: "450 Porter Ave B", city: "Ocean Springs", bedroomsNumber: 2 }],
+          count: 1,
+        });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        return Response.json({
+          result: [
+            {
+              id: 72011656,
+              listingMapId: 634553,
+              guestFirstName: "Dana",
+              guestLastName: "Anderson",
+              arrivalDate: "2026-11-20",
+              departureDate: "2026-11-23",
+              status: "new",
+              channelName: "airbnb",
+            },
+          ],
+          count: 1,
+        });
+      }
+      throw new Error(url);
+    });
+
+    const loaded = await loadLiveCalendar("2026-11-01", "2027-05-01");
+    expect(loaded.units.map((unit) => unit.id)).toEqual(["634553"]);
+    expect(loaded.stays.map((stay) => stay.guest)).toEqual(["Dana A."]);
+    expect(tokenWrites).toBe(2);
+    expect(listingCalls).toBe(2);
+    expect(authorizations).toContain("Bearer token-1");
+    expect(authorizations).toContain("Bearer token-2");
+    expect(JSON.stringify(loaded)).not.toContain("Anderson");
+  });
+
+  it("does not retry the calendar with a rejected token when the refresh fails", async () => {
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let tokenRequests = 0;
+    let listingCalls = 0;
+    setHostawayFetchForTests(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/accessTokens")) {
+        tokenRequests += 1;
+        if (tokenRequests === 1) return Response.json({ access_token: "token-1" });
+        return new Response("unavailable", { status: 500, headers: { "retry-after": "0" } });
+      }
+      if (url.includes("/listings")) {
+        listingCalls += 1;
+        return new Response("denied", { status: 401 });
+      }
+      if (url.includes("/reservations")) return Response.json({ result: [], count: 0 });
+      throw new Error(url);
+    });
+
+    await expect(loadLiveCalendar("2026-11-01", "2027-05-01")).rejects.toThrow(/access token|Hostaway/i);
+    expect(listingCalls).toBe(1);
+  });
+
 });
 
 describe("snapshot cache", () => {
@@ -431,6 +684,158 @@ describe("snapshot cache", () => {
     expect(stale?.stale).toBe(true);
     expect(stale?.snapshot.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
     expect(calls).toHaveLength(before);
+  });
+
+  it("forced warm refetches an expired Hostaway calendar and replaces the snapshot", async () => {
+    process.env.DATA_MODE = "live";
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    let generation = 0;
+    const calls: string[] = [];
+    setHostawayFetchForTests(async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/accessTokens")) return Response.json({ access_token: "token-1" });
+      if (url.includes("/listings")) {
+        const result = [{ id: 484247, name: "Porter House", city: "Ocean Springs", bedroomsNumber: 3 }];
+        if (generation > 0) {
+          result.push({ id: 634553, name: "450 Porter Ave B", city: "Ocean Springs", bedroomsNumber: 2 });
+        }
+        return Response.json({ result, count: result.length });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: generation === 0 ? 1 : 2, offset });
+        const result = [
+          {
+            id: 1,
+            listingMapId: 484247,
+            guestFirstName: "Camille",
+            guestLastName: "Duval",
+            arrivalDate: "2026-11-03",
+            departureDate: "2026-11-08",
+            status: generation === 0 ? "new" : "cancelled",
+            channelName: "airbnb",
+          },
+        ];
+        if (generation > 0) {
+          result.push({
+            id: 72011656,
+            listingMapId: 484247,
+            guestFirstName: "Dana",
+            guestLastName: "Anderson",
+            arrivalDate: "2026-11-20",
+            departureDate: "2026-11-23",
+            status: "new",
+            channelName: "airbnb",
+          });
+        }
+        return Response.json({ result, count: result.length });
+      }
+      throw new Error(url);
+    });
+
+    const now = new Date("2026-11-05T18:00:00Z");
+    const warmed = await warmSnapshot(now, { force: true });
+    expect(warmed.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    const callsAfterFresh = calls.length;
+    const repeated = await warmSnapshot(now, { force: true });
+    expect(repeated.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    expect(calls).toHaveLength(callsAfterFresh);
+
+    generation = 1;
+    setTimedCacheForTests(
+      "hostaway-calendar:2026-11-01:2027-05-01",
+      { stays: warmed.stays, units: warmed.units },
+      Date.now() - 1000,
+    );
+    const later = new Date("2026-11-05T18:10:00Z");
+    const refreshed = await warmSnapshot(later, { force: true });
+    expect(refreshed.fetchedAt).toBe(later.toISOString());
+    expect(refreshed.units?.map((unit) => unit.id)).toEqual(["484247", "634553"]);
+    expect(refreshed.stays.map((stay) => stay.id)).toEqual(["hostaway-72011656"]);
+    expect(refreshed.stays.map((stay) => stay.guest)).toEqual(["Dana A."]);
+    const stored = await readCachedSnapshot(later);
+    expect(stored?.stale).toBe(false);
+    expect(stored?.snapshot.stays.map((stay) => stay.guest)).toEqual(["Dana A."]);
+    expect(stored?.snapshot.fetchedAt).toBe(later.toISOString());
+    expect(JSON.stringify(stored?.snapshot)).not.toContain("Anderson");
+  });
+
+  it("keeps the last snapshot when a forced warm cannot reach Hostaway", async () => {
+    process.env.DATA_MODE = "live";
+    process.env.HOSTAWAY_ACCOUNT_ID = "acct";
+    process.env.HOSTAWAY_API_KEY = "secret-key";
+    const calls: string[] = [];
+    setHostawayFetchForTests(async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith("/accessTokens")) return Response.json({ access_token: "token-1" });
+      if (url.includes("/listings")) {
+        return Response.json({
+          result: [{ id: 11, name: "Peaceful Pearl", city: "Ocean Springs", bedroomsNumber: 4 }],
+          count: 1,
+        });
+      }
+      if (url.includes("/reservations")) {
+        const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+        if (offset > 0) return Response.json({ result: [], count: 1, offset });
+        return Response.json({
+          result: [
+            {
+              id: 1,
+              listingMapId: 11,
+              guestFirstName: "Camille",
+              guestLastName: "Duval",
+              arrivalDate: "2026-11-03",
+              departureDate: "2026-11-08",
+              status: "new",
+              channelName: "airbnb",
+            },
+          ],
+          count: 1,
+        });
+      }
+      throw new Error(url);
+    });
+
+    const now = new Date("2026-11-05T18:00:00Z");
+    const warmed = await warmSnapshot(now);
+    setHostawayFetchForTests(async () => new Response("down", { status: 400 }));
+    setTimedCacheForTests(snapshotCacheKey(now), warmed, Date.now() + 60_000);
+    setTimedCacheForTests(
+      "hostaway-calendar:2026-11-01:2027-05-01",
+      { stays: warmed.stays, units: warmed.units },
+      Date.now() - 1000,
+    );
+    await expect(warmSnapshot(now, { force: true })).rejects.toThrow(/access token|Hostaway/i);
+    const callsAfterFailure = calls.length;
+    const cached = await readCachedSnapshot(now);
+    expect(cached?.snapshot.fetchedAt).toBe(warmed.fetchedAt);
+    expect(cached?.snapshot.stays.map((stay) => stay.guest)).toEqual(["Camille D."]);
+    expect(cached?.snapshot.units?.map((unit) => unit.id)).toEqual(["11"]);
+    expect(calls).toHaveLength(callsAfterFailure);
+  });
+});
+
+describe("timed cache", () => {
+  afterEach(() => {
+    clearTimedCache();
+  });
+
+  it("refetches an expired entry instead of serving it forever", async () => {
+    let loads = 0;
+    const load = async () => {
+      loads += 1;
+      return `value-${loads}`;
+    };
+    expect(await remember("sample", 1000, load)).toBe("value-1");
+    expect(await remember("sample", 1000, load)).toBe("value-1");
+    setTimedCacheForTests("sample", "value-1", Date.now() - 1);
+    expect(await remember("sample", 1000, load)).toBe("value-2");
+    setTimedCacheForTests("sample", "value-2", Date.now() - 1);
+    expect(await remember("sample", 1000, load, { allowStale: true })).toBe("value-2");
+    expect(loads).toBe(2);
   });
 });
 
